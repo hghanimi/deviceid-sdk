@@ -1,9 +1,6 @@
 {
-  "build": {
-    "command": "npm run build",
-    "cwd": "/",
-    "destination": "dist"
-  },
+  "name": "deviceid-cdn",
+  "pages_build_output_dir": "dist",
   "env": {
     "production": {
       "vars": {

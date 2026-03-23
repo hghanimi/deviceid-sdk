@@ -1,10 +1,6 @@
-name = "deviceid-sdk"
-main = "src/client/index.js"
+name = "deviceid-cdn"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Hyperdrive binding for PostgreSQL
-[[hyperdrive]]
-binding = "DB"
-id = "your-hyperdrive-id"
-localConnectionString = "postgresql://postgres:password@localhost:5432/deviceid"
+# Note: Hyperdrive is configured in api/wrangler.jsonc (the Worker project)
+# This root config is for Pages CDN deployment only - no DB bindings needed
