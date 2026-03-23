@@ -103,7 +103,7 @@ app.get('/v1/dashboard', async (c) => {
   }
 
   try {
-    const [overview, merchants, riskyEvents, hourly] = await Promise.all([
+    const [overview, merchants, riskyEvents, hourly, allEventsQ] = await Promise.all([
       db.query(
         `SELECT
            COUNT(*)::int AS events_24h,
@@ -116,7 +116,14 @@ app.get('/v1/dashboard', async (c) => {
                 OR is_incognito = true
                 OR headless_score >= 40
                 OR bot_score >= 2
-           )::int AS high_risk_24h
+           )::int AS high_risk_24h,
+           ROUND(AVG(
+             CASE
+               WHEN is_vpn OR is_incognito OR headless_score >= 40 OR bot_score >= 2 THEN 30
+               WHEN visit_count > 3 THEN 95
+               ELSE 75
+             END
+           ))::int AS avg_confidence_pct
          FROM fingerprints
          WHERE last_seen >= NOW() - INTERVAL '24 hours'`
       ),
@@ -169,24 +176,47 @@ app.get('/v1/dashboard', async (c) => {
         `SELECT
            DATE_TRUNC('hour', last_seen) AS hour_bucket,
            COUNT(*)::int AS events,
-           COUNT(DISTINCT visitor_id)::int AS unique_devices
+           COUNT(DISTINCT visitor_id)::int AS unique_devices,
+           COUNT(*) FILTER (
+             WHERE NOT (is_vpn OR is_incognito OR headless_score >= 40 OR bot_score >= 2)
+           )::int AS trusted,
+           COUNT(*) FILTER (
+             WHERE is_vpn = true OR is_incognito = true OR headless_score >= 40 OR bot_score >= 2
+           )::int AS high_risk
          FROM fingerprints
          WHERE last_seen >= NOW() - INTERVAL '24 hours'
          GROUP BY hour_bucket
          ORDER BY hour_bucket ASC`
+      ),
+      db.query(
+        `SELECT
+           f.visitor_id,
+           f.last_seen,
+           f.first_seen,
+           f.ip_address,
+           f.is_vpn,
+           f.is_incognito,
+           f.headless_score,
+           f.bot_score,
+           f.visit_count,
+           k.name AS merchant_name,
+           k.public_key
+         FROM fingerprints f
+         JOIN api_keys k ON k.id = f.api_key_id
+         WHERE f.last_seen >= NOW() - INTERVAL '24 hours'
+         ORDER BY f.last_seen DESC
+         LIMIT 200`
       ),
     ]);
 
     return c.json({
       window: '24h',
       generatedAt: new Date().toISOString(),
-      overview: overview.rows[0] || {
-        events_24h: 0,
-        unique_devices_24h: 0,
-        new_devices_24h: 0,
-        vpn_24h: 0,
-        incognito_24h: 0,
-        high_risk_24h: 0,
+      overview: {
+        ...(overview.rows[0] || {
+          events_24h: 0, unique_devices_24h: 0, new_devices_24h: 0,
+          vpn_24h: 0, incognito_24h: 0, high_risk_24h: 0, avg_confidence_pct: 0,
+        }),
       },
       merchants: merchants.rows.map((row: any) => ({
         name: row.name,
@@ -207,14 +237,97 @@ app.get('/v1/dashboard', async (c) => {
         visitCount: row.visit_count,
         lastSeen: row.last_seen,
       })),
+      allEvents: allEventsQ.rows.map((row: any) => ({
+        visitorId: row.visitor_id,
+        merchantName: row.merchant_name,
+        publicKey: row.public_key,
+        ipAddress: row.ip_address,
+        isVpn: row.is_vpn,
+        isIncognito: row.is_incognito,
+        headlessScore: row.headless_score,
+        botScore: row.bot_score,
+        visitCount: row.visit_count,
+        firstSeen: row.first_seen,
+        lastSeen: row.last_seen,
+      })),
       hourly: hourly.rows.map((row: any) => ({
         hour: row.hour_bucket,
         events: row.events,
         uniqueDevices: row.unique_devices,
+        trusted: row.trusted,
+        highRisk: row.high_risk,
       })),
     });
   } catch (err: any) {
     return c.json({ error: 'Dashboard query failed', details: err.message }, 500);
+  }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// VISITOR DETAIL ENDPOINT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+app.get('/v1/visitor/:id', async (c) => {
+  const db = c.get('db') as any;
+  const apiKey = c.get('apiKey') as any;
+  const visitorId = c.req.param('id');
+
+  if (!apiKey?.public_key || !String(apiKey.public_key).startsWith('pk_live_wayl')) {
+    return c.json({ error: 'Restricted to Wayl operator keys.' }, 403);
+  }
+
+  try {
+    const [profile, links] = await Promise.all([
+      db.query(
+        `SELECT f.*, k.name AS merchant_name
+         FROM fingerprints f
+         JOIN api_keys k ON k.id = f.api_key_id
+         WHERE f.visitor_id = $1
+         ORDER BY f.last_seen DESC
+         LIMIT 1`,
+        [visitorId]
+      ),
+      db.query(
+        `SELECT visitor_id_a, visitor_id_b, link_type, confidence, created_at
+         FROM device_links
+         WHERE visitor_id_a = $1 OR visitor_id_b = $1
+         ORDER BY confidence DESC
+         LIMIT 20`,
+        [visitorId]
+      ),
+    ]);
+
+    if (profile.rows.length === 0) return c.json({ error: 'Visitor not found' }, 404);
+
+    const p = profile.rows[0];
+    return c.json({
+      visitorId,
+      merchantName: p.merchant_name,
+      firstSeen: p.first_seen,
+      lastSeen: p.last_seen,
+      visitCount: p.visit_count,
+      ipAddress: p.ip_address,
+      isVpn: p.is_vpn,
+      isIncognito: p.is_incognito,
+      headlessScore: p.headless_score,
+      botScore: p.bot_score,
+      hashes: {
+        canvas: p.canvas_hash,
+        webgl: p.webgl_hash,
+        audio: p.audio_hash,
+        screen: p.screen_hash,
+        fonts: p.font_hash,
+        browser: p.browser_hash,
+        hardware: p.hardware_hash,
+      },
+      linkedDevices: links.rows.map((l: any) => ({
+        linkedId: l.visitor_id_a === visitorId ? l.visitor_id_b : l.visitor_id_a,
+        linkType: l.link_type,
+        confidence: l.confidence,
+        linkedAt: l.created_at,
+      })),
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Visitor query failed', details: err.message }, 500);
   }
 });
 
