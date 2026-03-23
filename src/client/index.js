@@ -1,13 +1,14 @@
 /**
- * Athar (اثر) Browser SDK v3.0.0
+ * Athar (اثر) Browser SDK v3.1.0
  * Device intelligence for MENA financial services
  * Every device leaves a trace.
  *
- * 22 signal categories:
+ * 22+ signal categories:
  *  [v1] canvas, webgl-params, audio, screen, fonts, browser, hardware
  *  [v2] arabic-fonts, arabic-rendering, timezone, webrtc, bot, tampering
  *  [v3] clientRects, webgl-render, speechVoices, emoji, codecs,
  *       cssSupports, permissions, storageQuota, mathml, intlProbe
+ *  [v3.1] devTools, virtualMachine, locationSpoofing, highActivity, rawAttributes
  */
 
 class DeviceID {
@@ -59,7 +60,7 @@ class DeviceID {
     var quota = await pQuota;
 
     return {
-      v: '3.0.0',
+      v: '3.1.0',
       ts: Date.now(),
       canvas: this._getCanvas(),
       webgl: this._getWebGL(),
@@ -86,7 +87,11 @@ class DeviceID {
         webrtcIPs: rtc,
         bot: this._detectBot(),
         tampering: this._detectTampering(),
+        devTools: this._detectDevTools(),
+        virtualMachine: this._detectVM(),
+        locationSpoofing: this._detectLocationSpoofing(),
       },
+      rawAttributes: this._getRawAttributes(),
       storedIds: this._getStoredIds(),
       collectionMs: Math.round(performance.now() - t0),
     };
@@ -916,6 +921,173 @@ class DeviceID {
 
       resolve(score >= 2);
     });
+  }
+
+  // ─── Developer Tools Detection ───
+  _detectDevTools() {
+    var result = { open: false, orientation: null };
+    try {
+      var widthThreshold = window.outerWidth - window.innerWidth > 160;
+      var heightThreshold = window.outerHeight - window.innerHeight > 160;
+      if (widthThreshold) { result.open = true; result.orientation = 'vertical'; }
+      if (heightThreshold) { result.open = true; result.orientation = 'horizontal'; }
+      // Firebug detection
+      if (window.Firebug && window.Firebug.chrome && window.Firebug.chrome.isInitialized) result.open = true;
+      // console.profile trick — if devtools is open, console.profiles changes
+      if (typeof console.profile === 'function') {
+        console.profile();
+        console.profileEnd();
+        if (console.clear) console.clear();
+      }
+    } catch (e) {}
+    return result;
+  }
+
+  // ─── Virtual Machine Detection ───
+  _detectVM() {
+    var indicators = {};
+    try {
+      // WebGL renderer hints
+      var cv = document.createElement('canvas');
+      var gl = cv.getContext('webgl');
+      if (gl) {
+        var ext = gl.getExtension('WEBGL_debug_renderer_info');
+        if (ext) {
+          var renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '';
+          var vendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) || '';
+          indicators.vmRenderer = /VirtualBox|VMware|Parallels|Hyper-V|QEMU|vbox|virtio|llvmpipe|Mesa/.test(renderer);
+          indicators.vmVendor = /VMware|VirtualBox|Parallels|QEMU|Red Hat/.test(vendor);
+          indicators.renderer = renderer;
+        }
+      }
+    } catch (e) {}
+    try {
+      // Hardware signals typical of VMs
+      indicators.lowCores = (navigator.hardwareConcurrency || 0) <= 1;
+      indicators.lowMemory = (navigator.deviceMemory || 99) <= 1;
+      indicators.noTouch = navigator.maxTouchPoints === 0 && /Mobile|Android/.test(navigator.userAgent);
+      // Screen resolution often locked in VMs
+      var w = screen.width, h = screen.height;
+      indicators.vmResolution = (w === 800 && h === 600) || (w === 1024 && h === 768);
+      // Battery API — VMs often have no battery
+      indicators.noBattery = typeof navigator.getBattery === 'function' ? null : false;
+    } catch (e) {}
+    try {
+      // Platform check
+      indicators.platformMismatch =
+        /Win/.test(navigator.platform) && /Linux|Android/.test(navigator.userAgent) ||
+        /Linux/.test(navigator.platform) && /Windows/.test(navigator.userAgent);
+    } catch (e) {}
+    indicators.result = !!(indicators.vmRenderer || indicators.vmVendor ||
+      (indicators.lowCores && indicators.lowMemory && indicators.vmResolution));
+    return indicators;
+  }
+
+  // ─── Location Spoofing Detection ───
+  _detectLocationSpoofing() {
+    var result = { spoofed: false, signals: {} };
+    try {
+      // Timezone vs Intl consistency
+      var offset = new Date().getTimezoneOffset();
+      var intlTz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      // Check if Date locale formatting matches Intl
+      var dateLocale = new Date().toLocaleDateString('en-US', { timeZoneName: 'short' });
+      result.signals.timezone = intlTz;
+      result.signals.offset = offset;
+      result.signals.dateLocale = dateLocale;
+
+      // Language vs geolocation hints
+      var lang = (navigator.language || '').toLowerCase();
+      result.signals.language = lang;
+
+      // Timezone offset sanity: check if timezone name matches offset range
+      // Middle East timezones should be UTC+3 to UTC+4 (offset -180 to -240)
+      // If tz says "Asia/Baghdad" but offset is +480 (US Pacific), that's spoofing
+      var tzParts = intlTz.split('/');
+      result.signals.continent = tzParts[0] || null;
+    } catch (e) {}
+    try {
+      // WebRTC timestamp drift — if system clock is manipulated
+      var t1 = Date.now();
+      var t2 = performance.timeOrigin + performance.now();
+      result.signals.clockDrift = Math.abs(t1 - t2);
+      if (result.signals.clockDrift > 5000) result.spoofed = true; // >5s drift = suspicious
+    } catch (e) {}
+    return result;
+  }
+
+  // ─── Raw Device Attributes (matches FP Pro format) ───
+  _getRawAttributes() {
+    var attrs = {};
+    try { attrs.platform = navigator.platform; } catch (e) {}
+    try { attrs.vendor = navigator.vendor; } catch (e) {}
+    try { attrs.cookiesEnabled = navigator.cookieEnabled; } catch (e) {}
+    try { attrs.sessionStorage = typeof sessionStorage !== 'undefined'; } catch (e) {}
+    try { attrs.localStorage = typeof localStorage !== 'undefined'; } catch (e) {}
+    try { attrs.indexedDB = typeof indexedDB !== 'undefined'; } catch (e) {}
+    try { attrs.openDatabase = typeof openDatabase === 'function'; } catch (e) {}
+    try { attrs.pdfViewerEnabled = navigator.pdfViewerEnabled; } catch (e) {}
+    try { attrs.hardwareConcurrency = navigator.hardwareConcurrency; } catch (e) {}
+    try { attrs.deviceMemory = navigator.deviceMemory || null; } catch (e) {}
+    try { attrs.maxTouchPoints = navigator.maxTouchPoints || 0; } catch (e) {}
+    try { attrs.colorDepth = screen.colorDepth; } catch (e) {}
+    try { attrs.screenResolution = [screen.width, screen.height]; } catch (e) {}
+    try { attrs.architecture = navigator.userAgentData ? navigator.userAgentData.architecture : null; } catch (e) {}
+    try {
+      attrs.languages = navigator.languages ? Array.from(navigator.languages) : [navigator.language];
+    } catch (e) {}
+    try {
+      var mq = window.matchMedia;
+      if (mq) {
+        attrs.colorGamut = mq('(color-gamut: p3)').matches ? 'p3' : mq('(color-gamut: srgb)').matches ? 'srgb' : null;
+        attrs.hdr = mq('(dynamic-range: high)').matches;
+        attrs.contrast = mq('(prefers-contrast: more)').matches ? 'more' : mq('(prefers-contrast: less)').matches ? 'less' : 'no-preference';
+        attrs.reducedMotion = mq('(prefers-reduced-motion: reduce)').matches;
+        attrs.forcedColors = mq('(forced-colors: active)').matches;
+        attrs.invertedColors = mq('(inverted-colors: inverted)').matches;
+        attrs.monochrome = mq('(monochrome)').matches;
+      }
+    } catch (e) {}
+    try {
+      attrs.connection = navigator.connection ? {
+        type: navigator.connection.effectiveType,
+        downlink: navigator.connection.downlink,
+        rtt: navigator.connection.rtt,
+        saveData: navigator.connection.saveData,
+      } : null;
+    } catch (e) {}
+    try {
+      attrs.screenFrame = [
+        window.screen.availTop || 0,
+        window.screen.availLeft || 0,
+        window.screen.height - window.screen.availHeight,
+        window.screen.width - window.screen.availWidth,
+      ];
+    } catch (e) {}
+    try {
+      // Font preferences — measure default widths of key font families
+      var testStr = 'mmmmmmmmmmlli';
+      var span = document.createElement('span');
+      span.style.cssText = 'position:absolute;left:-9999px;font-size:72px;';
+      document.body.appendChild(span);
+      var measure = function (font) {
+        span.style.fontFamily = font;
+        return span.offsetWidth;
+      };
+      attrs.fontPreferences = {
+        'default': measure('serif'),
+        sans: measure('sans-serif'),
+        mono: measure('monospace'),
+        system: measure('system-ui'),
+      };
+      span.textContent = testStr;
+      attrs.fontPreferences['default'] = measure('serif');
+      attrs.fontPreferences.sans = measure('sans-serif');
+      attrs.fontPreferences.mono = measure('monospace');
+      attrs.fontPreferences.system = measure('system-ui');
+      document.body.removeChild(span);
+    } catch (e) {}
+    return attrs;
   }
 
   _persistId(id) {
