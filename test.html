@@ -220,7 +220,7 @@
         <div class="kpi-delta" id="kpi-visitors-d"></div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Avg Confidence Score</div>
+        <div class="kpi-label">Avg Risk Score (24h)</div>
         <div class="kpi-value" id="kpi-conf">—</div>
         <div class="kpi-delta" id="kpi-conf-d"></div>
       </div>
@@ -270,7 +270,7 @@
     </div>
     <div style="flex:1;overflow:auto;">
       <table style="min-width:900px">
-        <thead><tr><th>Timestamp</th><th>Visitor ID</th><th>Merchant</th><th>Confidence</th><th>IP Address</th><th>Risk Signals</th><th style="text-align:center">Visits</th></tr></thead>
+        <thead><tr><th>Timestamp</th><th>Visitor ID</th><th>Merchant</th><th>Risk Score</th><th>IP Address</th><th>Risk Signals</th><th style="text-align:center">Visits</th></tr></thead>
         <tbody id="events-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading events…</td></tr></tbody>
       </table>
     </div>
@@ -288,7 +288,7 @@
     </div>
     <div style="flex:1;overflow:auto;">
       <table style="min-width:850px">
-        <thead><tr><th>Visitor ID</th><th>Merchant</th><th>First Seen</th><th>Last Seen</th><th>Confidence</th><th>Risk Signals</th><th style="text-align:center">Visits</th></tr></thead>
+        <thead><tr><th>Visitor ID</th><th>Merchant</th><th>First Seen</th><th>Last Seen</th><th>Risk Score</th><th>Risk Signals</th><th style="text-align:center">Visits</th></tr></thead>
         <tbody id="identities-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading identities…</td></tr></tbody>
       </table>
     </div>
@@ -437,14 +437,17 @@ sdk.identify().then(result => {
     if (!data) return;
     const ov = data.overview;
     const hr = ov.events_24h > 0 ? ((ov.high_risk_24h / ov.events_24h) * 100).toFixed(1) : '0.0';
-    const conf = ov.avg_confidence_pct || Math.round(100 - parseFloat(hr) * 0.8);
+    // Avg risk: compute directly from allEvents using the same formula as the Worker
+    const avgRisk = allEvents.length
+      ? Math.round(allEvents.reduce((sum, e) => sum + calcRisk(e), 0) / allEvents.length)
+      : 0;
 
     document.getElementById('kpi-events').textContent = ov.events_24h.toLocaleString();
     document.getElementById('kpi-events-d').textContent = `${ov.new_devices_24h} new devices`;
     document.getElementById('kpi-visitors').textContent = ov.unique_devices_24h.toLocaleString();
-    document.getElementById('kpi-conf').textContent = conf + '%';
-    document.getElementById('kpi-conf').className = 'kpi-value ' + (conf >= 80 ? 'c-ok' : conf >= 60 ? 'c-warn' : 'c-danger');
-    document.getElementById('kpi-conf-d').textContent = conf >= 80 ? 'Healthy' : conf >= 60 ? 'Monitor' : 'Review needed';
+    document.getElementById('kpi-conf').textContent = avgRisk + '%';
+    document.getElementById('kpi-conf').className = 'kpi-value ' + (avgRisk >= 40 ? 'c-danger' : avgRisk >= 20 ? 'c-warn' : 'c-ok');
+    document.getElementById('kpi-conf-d').textContent = avgRisk >= 40 ? 'Elevated — review events' : avgRisk >= 20 ? 'Moderate — monitor' : 'Low — portfolio healthy';
     document.getElementById('kpi-risk').textContent = hr + '%';
     document.getElementById('kpi-risk').className = 'kpi-value ' + (parseFloat(hr) >= 20 ? 'c-danger' : parseFloat(hr) >= 8 ? 'c-warn' : 'c-ok');
     document.getElementById('kpi-risk-d').textContent = ov.high_risk_24h + ' flagged events';
@@ -534,13 +537,13 @@ sdk.identify().then(result => {
   function renderEventsRows(evs) {
     document.getElementById('evts-count').textContent = evs.length + ' events';
     document.getElementById('events-tbody').innerHTML = evs.map(e => {
-      const conf = calcConf(e);
+      const risk = calcRisk(e);
       const ts = fmtDate(e.lastSeen);
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
         <td class="mono" style="color:var(--muted)">${ts}</td>
         <td><span class="mono" style="color:var(--brand)">${esc((e.visitorId||'').substring(0,20))}…</span></td>
         <td>${esc(e.merchantName||'—')}</td>
-        <td>${confPill(conf)}</td>
+        <td>${confPill(risk)}</td>
         <td class="mono">${esc(e.ipAddress||'—')}</td>
         <td><div class="sigs">${sigBadges(e)}</div></td>
         <td style="text-align:center"><span class="badge b-muted">${e.visitCount||1}</span></td>
@@ -563,13 +566,13 @@ sdk.identify().then(result => {
   function renderIdentitiesRows(ids) {
     document.getElementById('ids-count').textContent = ids.length + ' identities';
     document.getElementById('identities-tbody').innerHTML = ids.map(e => {
-      const conf = calcConf(e);
+      const risk = calcRisk(e);
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
         <td><span class="mono" style="color:var(--brand)">${esc(e.visitorId||'—')}</span></td>
         <td>${esc(e.merchantName||'—')}</td>
         <td class="mono" style="color:var(--muted)">${fmtDate(e.firstSeen||e.lastSeen)}</td>
         <td class="mono" style="color:var(--muted)">${fmtDate(e.lastSeen)}</td>
-        <td>${confPill(conf)}</td>
+        <td>${confPill(risk)}</td>
         <td><div class="sigs">${sigBadges(e)}</div></td>
         <td style="text-align:center"><span class="badge b-brand">${e.visitCount||1}</span></td>
       </tr>`;
@@ -611,7 +614,7 @@ sdk.identify().then(result => {
   }
 
   function renderVisitorDetail(v) {
-    const conf = calcConf({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore, visitCount: v.visitCount });
+    const conf = calcRisk({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore, visitCount: v.visitCount });
     const hashes = v.hashes || {};
     const hashItems = [
       { label: 'Canvas',   val: hashes.canvas   },
@@ -668,7 +671,7 @@ sdk.identify().then(result => {
   }
 
   function renderVisitorDetailFallback(e) {
-    const conf = calcConf(e);
+    const conf = calcRisk(e);
     document.getElementById('so-body').innerHTML = `
       <div class="so-sec">
         <div class="so-sec-title">Risk Assessment</div>
@@ -693,18 +696,22 @@ sdk.identify().then(result => {
   }
 
   // ── Helpers ──────────────────────────────────────────────
-  function calcConf(e) {
-    let s = 85;
-    if (e.isVpn) s -= 30;
-    if (e.isIncognito) s -= 15;
-    if ((e.headlessScore||0) >= 40) s -= 25;
-    if ((e.botScore||0) >= 2) s -= 35;
-    if ((e.visitCount||1) > 5) s += 10;
-    return Math.min(95, Math.max(5, s));
+  // calcRisk mirrors the Worker's riskScore formula exactly (0-100)
+  function calcRisk(e) {
+    let s = 0;
+    if (!e.visitCount || e.visitCount <= 1) s += 15;  // new device
+    if (e.isVpn)                             s += 25;
+    if (e.isIncognito)                       s += 20;
+    if ((e.headlessScore||0) >= 40)          s += 30;
+    if ((e.botScore||0) >= 2)                s += 35;
+    return Math.min(100, Math.max(0, s));
   }
+  // Keep alias so slide-out fallback still works
+  function calcConf(e) { return calcRisk(e); }
 
+  // Risk pill: 0=green (clean), 40+=red (high risk)
   function confPill(pct, large) {
-    const cls = pct >= 75 ? 'cp-hi' : pct >= 50 ? 'cp-md' : 'cp-lo';
+    const cls = pct >= 40 ? 'cp-lo' : pct >= 20 ? 'cp-md' : 'cp-hi';
     const style = large ? 'font-size:15px;padding:4px 12px' : '';
     return `<span class="cpill ${cls}" style="${style}">${pct}%</span>`;
   }
