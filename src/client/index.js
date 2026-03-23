@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 
 // Assuming you have adapted these to be edge-compatible (no Node-specific APIs)
 import SignalHasher from '../server/services/Hasher';
-import FuzzyMatcher from '../server/services/matcher';
+import FuzzyMatcher from '../server/matcher';
 import IdentityGraph from '../server/services/graph';
 
 const app = new Hono();

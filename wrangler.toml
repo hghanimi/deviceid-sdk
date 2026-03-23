@@ -1,6 +1,7 @@
 name = "deviceid-sdk"
 main = "src/client/index.js"
 compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
 
 # Hyperdrive binding for PostgreSQL
 [[hyperdrive]]
