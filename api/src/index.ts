@@ -106,13 +106,11 @@ app.post('/v1/fingerprint', async (c) => {
     const clientIp = c.req.header('CF-Connecting-IP') || '0.0.0.0';
     const db = c.get('db') as any;
 
-    // Simple hash function
     const hashSignal = (signal: any): string => {
       return createHash('sha256').update(JSON.stringify(signal)).digest('hex');
     };
 
-    // Hash signals (exclude storedIds so returning visitors match correctly)
-    const { storedIds, ...stableSignals } = signals;
+    const { storedIds, behavior, ...stableSignals } = signals;
     const hashes = {
       composite: hashSignal(stableSignals),
       canvas: hashSignal(stableSignals.canvas || ''),
@@ -124,82 +122,148 @@ app.post('/v1/fingerprint', async (c) => {
       hardware: hashSignal(stableSignals.hardware || ''),
     };
 
-    // --- Tier 1: Exact composite hash match ---
+    const persistFingerprint = async (resolvedVisitorId: string) => {
+      await db.query(
+        `INSERT INTO fingerprints
+          (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
+           screen_hash, font_hash, browser_hash, hardware_hash,
+           ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         ON CONFLICT (raw_hash, api_key_id)
+         DO UPDATE SET
+           last_seen = NOW(),
+           visit_count = fingerprints.visit_count + 1,
+           ip_address = EXCLUDED.ip_address,
+           is_vpn = EXCLUDED.is_vpn,
+           is_incognito = EXCLUDED.is_incognito,
+           headless_score = EXCLUDED.headless_score,
+           bot_score = EXCLUDED.bot_score`,
+        [
+          resolvedVisitorId, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
+          hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
+          clientIp,
+          (signals.evasion?.webrtcIPs?.length || 0) > 0,
+          signals.evasion?.isPrivate || false,
+          signals.evasion?.headlessScore || 0,
+          Object.values(signals.evasion?.bot || {}).filter(Boolean).length,
+          apiKeyId,
+        ]
+      );
+    };
+
+    const computeBehaviorRisk = (profile: any) => {
+      if (!profile) return 0;
+      let score = 0;
+      if (profile.durationMs < 1500 && profile.totalEvents === 0) score += 15;
+      if (profile.totalEvents > 0 && profile.mouseMoves === 0 && profile.touches === 0 && profile.clicks > 0) score += 10;
+      if (profile.keys > 3 && profile.averageKeyIntervalMs > 0 && profile.averageKeyIntervalMs < 45) score += 10;
+      if (profile.clicks > 2 && profile.averageClickIntervalMs > 0 && profile.averageClickIntervalMs < 120) score += 8;
+      if (profile.visibilityState === 'hidden') score += 6;
+      if (!profile.hasFocus) score += 4;
+      return Math.min(30, score);
+    };
+
+    const scoreCandidate = (candidate: any) => {
+      const weights = {
+        screen: 0.24,
+        fonts: 0.22,
+        hardware: 0.22,
+        webgl: 0.10,
+        canvas: 0.08,
+        browser: 0.08,
+        audio: 0.06,
+      };
+
+      let score = 0;
+      let stableMatches = 0;
+      if (candidate.screen_hash === hashes.screen) { score += weights.screen; stableMatches += 1; }
+      if (candidate.font_hash === hashes.fonts) { score += weights.fonts; stableMatches += 1; }
+      if (candidate.hardware_hash === hashes.hardware) { score += weights.hardware; stableMatches += 1; }
+      if (candidate.webgl_hash === hashes.webgl) score += weights.webgl;
+      if (candidate.canvas_hash === hashes.canvas) score += weights.canvas;
+      if (candidate.browser_hash === hashes.browser) score += weights.browser;
+      if (candidate.audio_hash === hashes.audio) score += weights.audio;
+
+      if (stableMatches === 3) score += 0.08;
+      if (stableMatches >= 2 && candidate.ip_address === clientIp) score += 0.04;
+
+      return {
+        visitorId: candidate.visitor_id,
+        score: Number(Math.min(0.99, score).toFixed(2)),
+        stableMatches,
+      };
+    };
+
     let visitorId: string;
     let isNew = true;
     let matchConfidence = 1.0;
+    let matchMethod = 'new-device';
 
-    const exactMatch = await db.query(
-      'SELECT visitor_id FROM fingerprints WHERE raw_hash = $1 AND api_key_id = $2 LIMIT 1',
-      [hashes.composite, apiKeyId]
-    );
-
-    if (exactMatch.rows.length > 0) {
-      // Exact match — same browser, same device
-      visitorId = exactMatch.rows[0].visitor_id;
-      isNew = false;
-      matchConfidence = 1.0;
-      await db.query(
-        `UPDATE fingerprints SET last_seen = NOW(), visit_count = visit_count + 1, ip_address = $1
-         WHERE visitor_id = $2 AND api_key_id = $3`,
-        [clientIp, visitorId, apiKeyId]
-      );
-    } else {
-      // --- Tier 2: Fuzzy match on browser-agnostic stable signals ---
-      // screen + fonts + hardware stay the same across browsers on the same device
-      const fuzzyMatch = await db.query(
-        `SELECT visitor_id FROM fingerprints
-         WHERE screen_hash = $1 AND font_hash = $2 AND hardware_hash = $3
-           AND api_key_id = $4
-         ORDER BY last_seen DESC LIMIT 1`,
-        [hashes.screen, hashes.fonts, hashes.hardware, apiKeyId]
+    const storedVisitorIds = [storedIds?.localStorage, storedIds?.sessionStorage].filter(Boolean);
+    if (storedVisitorIds.length > 0) {
+      const storedMatch = await db.query(
+        `SELECT visitor_id
+         FROM fingerprints
+         WHERE visitor_id = ANY($1) AND api_key_id = $2
+         ORDER BY last_seen DESC
+         LIMIT 1`,
+        [storedVisitorIds, apiKeyId]
       );
 
-      if (fuzzyMatch.rows.length > 0) {
-        // Same physical device, different browser — reuse visitor ID
-        visitorId = fuzzyMatch.rows[0].visitor_id;
+      if (storedMatch.rows.length > 0) {
+        visitorId = storedMatch.rows[0].visitor_id;
         isNew = false;
-        matchConfidence = 0.85;
-        // Store new composite hash as an alias so next visit from this browser is exact
-        await db.query(
-          `INSERT INTO fingerprints
-            (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
-             screen_hash, font_hash, browser_hash, hardware_hash,
-             ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-          [
-            visitorId, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
-            hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
-            clientIp,
-            (signals.evasion?.webrtcIPs?.length || 0) > 0,
-            signals.evasion?.isPrivate || false,
-            signals.evasion?.headlessScore || 0,
-            Object.values(signals.evasion?.bot || {}).filter(Boolean).length,
-            apiKeyId,
-          ]
-        );
-      } else {
-        // --- Tier 3: Genuinely new device ---
-        visitorId = `dvc_${nanoid(16)}`;
-        matchConfidence = 1.0;
-        await db.query(
-          `INSERT INTO fingerprints
-            (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
-             screen_hash, font_hash, browser_hash, hardware_hash,
-             ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-          [
-            visitorId, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
-            hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
-            clientIp,
-            (signals.evasion?.webrtcIPs?.length || 0) > 0,
-            signals.evasion?.isPrivate || false,
-            signals.evasion?.headlessScore || 0,
-            Object.values(signals.evasion?.bot || {}).filter(Boolean).length,
-            apiKeyId,
-          ]
-        );
+        matchConfidence = 0.99;
+        matchMethod = 'stored-id';
+        await persistFingerprint(visitorId);
       }
+    }
+
+    if (!visitorId) {
+      const exactMatch = await db.query(
+        'SELECT visitor_id FROM fingerprints WHERE raw_hash = $1 AND api_key_id = $2 LIMIT 1',
+        [hashes.composite, apiKeyId]
+      );
+
+      if (exactMatch.rows.length > 0) {
+        visitorId = exactMatch.rows[0].visitor_id;
+        isNew = false;
+        matchConfidence = 1.0;
+        matchMethod = 'exact';
+        await persistFingerprint(visitorId);
+      }
+    }
+
+    if (!visitorId) {
+      const candidates = await db.query(
+        `SELECT visitor_id, ip_address, screen_hash, font_hash, hardware_hash,
+                webgl_hash, canvas_hash, browser_hash, audio_hash, last_seen
+         FROM fingerprints
+         WHERE api_key_id = $1
+         ORDER BY last_seen DESC
+         LIMIT 250`,
+        [apiKeyId]
+      );
+
+      const scored = candidates.rows
+        .map((row: any) => scoreCandidate(row))
+        .filter((candidate: any) => candidate.stableMatches >= 2 && candidate.score >= 0.60)
+        .sort((left: any, right: any) => right.score - left.score);
+
+      if (scored.length > 0) {
+        visitorId = scored[0].visitorId;
+        isNew = false;
+        matchConfidence = scored[0].score;
+        matchMethod = 'weighted';
+        await persistFingerprint(visitorId);
+      }
+    }
+
+    if (!visitorId) {
+      visitorId = `dvc_${nanoid(16)}`;
+      matchConfidence = 1.0;
+      matchMethod = 'new-device';
+      await persistFingerprint(visitorId);
     }
 
     // Get linked devices
@@ -212,12 +276,14 @@ app.post('/v1/fingerprint', async (c) => {
 
     // Calculate risk score
     let riskScore = 0;
+    const behaviorRisk = computeBehaviorRisk(behavior);
     if (isNew) riskScore += 20;
     if ((signals.evasion?.webrtcIPs?.length || 0) > 0) riskScore += 30;
     if (signals.evasion?.isPrivate) riskScore += 25;
     if (signals.evasion?.headlessScore > 0.5) riskScore += 35;
     if (Object.values(signals.evasion?.bot || {}).filter(Boolean).length > 0) riskScore += 40;
     if (linkedResult.rows.length > 3) riskScore += 15;
+    riskScore += behaviorRisk;
     riskScore = Math.min(100, Math.max(0, riskScore));
 
     const processingTime = Date.now() - startTime;
@@ -226,6 +292,8 @@ app.post('/v1/fingerprint', async (c) => {
       visitorId,
       isNew,
       confidence: isNew ? 1.0 : matchConfidence,
+      matchMethod,
+      behaviorRisk,
       riskScore,
       linkedDevices: linkedResult.rows.map(d => ({
         visitorIdA: d.visitor_id_a,
