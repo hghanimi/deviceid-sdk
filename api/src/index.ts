@@ -262,10 +262,25 @@ app.post('/v1/fingerprint', async (c) => {
       [visitorId, apiKeyId]
     );
 
+    // Secondary VPN heuristic: the same visitor rotating across multiple public IPs recently.
+    const recentIpsResult = await db.query(
+      `SELECT DISTINCT ip_address
+       FROM fingerprints
+       WHERE visitor_id = $1 AND api_key_id = $2 AND ip_address IS NOT NULL
+       ORDER BY ip_address
+       LIMIT 20`,
+      [visitorId, apiKeyId]
+    );
+    const distinctRecentPublicIps = recentIpsResult.rows
+      .map((row: any) => normalizeIp(row.ip_address))
+      .filter((ip: string) => !!ip && !isPrivateIp(ip));
+    const vpnByIpRotation = new Set(distinctRecentPublicIps).size > 1;
+    const finalIsVpn = isVpn || vpnByIpRotation;
+
     // ─── Risk scoring ───
     let riskScore = 0;
     if (isNew) riskScore += 15;
-    if (isVpn) riskScore += 25;
+    if (finalIsVpn) riskScore += 25;
     if (evasion?.isPrivate) riskScore += 20;
     if ((evasion?.headlessScore || 0) > 0.4) riskScore += 30;
     if (botCount > 0) riskScore += 35;
@@ -286,7 +301,7 @@ app.post('/v1/fingerprint', async (c) => {
       matchedSignals: matchedSignals.length > 0 ? matchedSignals : undefined,
       riskScore,
       riskSignals: {
-        vpn: isVpn,
+        vpn: finalIsVpn,
         incognito: evasion?.isPrivate || false,
         headless: (evasion?.headlessScore || 0) > 0.4,
         bot: botCount >= 2,
