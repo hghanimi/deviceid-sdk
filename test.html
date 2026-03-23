@@ -265,7 +265,12 @@
     </div>
 
     <!-- Identity Linking KPI Row -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+      <div class="kpi k-accent">
+        <div class="kpi-label">Unique Persons</div>
+        <div class="kpi-value" id="kpi-persons" style="color:var(--accent)">—</div>
+        <div class="kpi-sub" id="kpi-persons-d">Devices collapsed by identity</div>
+      </div>
       <div class="kpi k-accent">
         <div class="kpi-label">Linked Identities</div>
         <div class="kpi-value" id="kpi-linked" style="color:var(--accent)">—</div>
@@ -608,6 +613,11 @@ sdk.identify().then(result =&gt; {
     document.getElementById('kpi-avgrisk-d').textContent = avgRisk >= 40 ? 'Elevated' : avgRisk >= 20 ? 'Moderate' : 'Healthy';
 
     // Identity linking KPIs
+    setKpi('kpi-persons', (ov.unique_persons || ov.unique_devices_24h || 0).toLocaleString(), null);
+    const personsDiff = (ov.unique_devices_24h || 0) - (ov.unique_persons || ov.unique_devices_24h || 0);
+    document.getElementById('kpi-persons-d').textContent = personsDiff > 0
+      ? `${personsDiff} device(s) linked together`
+      : 'Devices collapsed by identity';
     setKpi('kpi-linked', (ov.linked_identities || 0).toLocaleString(), null);
     document.getElementById('kpi-linked-d').textContent = 'Cross-device linked visitors';
     setKpi('kpi-vpn', (ov.vpn_24h || 0).toLocaleString(), null);

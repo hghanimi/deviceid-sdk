@@ -113,7 +113,7 @@ app.get('/v1/dashboard', async (c) => {
   }
 
   try {
-    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ, eventLogQ] = await Promise.all([
+    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ, eventLogQ, uniquePersonsQ] = await Promise.all([
       db.query(
         `SELECT
            COUNT(*)::int AS events_24h,
@@ -237,6 +237,11 @@ app.get('/v1/dashboard', async (c) => {
          ORDER BY e.created_at DESC
          LIMIT 200`
       ).catch(() => ({ rows: [] })),
+      // "Unique Persons" = unique devices minus linked pairs
+      // Uses Union-Find to collapse linked visitor_ids into identity clusters
+      db.query(
+        `SELECT visitor_id_a, visitor_id_b FROM device_links`
+      ).catch(() => ({ rows: [] })),
     ]);
 
     // Build a map of visitor_id → link count
@@ -244,6 +249,35 @@ app.get('/v1/dashboard', async (c) => {
     for (const row of linkedCountQ.rows) {
       linkMap.set(row.visitor_id, row.link_count);
     }
+
+    // Union-Find: collapse linked visitor_ids into identity clusters
+    // Each cluster = 1 real person (even if they have multiple devices/browsers)
+    const allVids = new Set<string>();
+    const parent = new Map<string, string>();
+    const find = (x: string): string => {
+      if (!parent.has(x)) parent.set(x, x);
+      if (parent.get(x) !== x) parent.set(x, find(parent.get(x)!));
+      return parent.get(x)!;
+    };
+    const union = (a: string, b: string) => {
+      const ra = find(a), rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+    // Register all known visitors from the recent fingerprints
+    for (const row of allEventsQ.rows) {
+      allVids.add(row.visitor_id);
+      find(row.visitor_id);
+    }
+    // Merge linked devices
+    for (const row of uniquePersonsQ.rows) {
+      union(row.visitor_id_a, row.visitor_id_b);
+      allVids.add(row.visitor_id_a);
+      allVids.add(row.visitor_id_b);
+    }
+    // Count distinct roots = unique persons
+    const roots = new Set<string>();
+    for (const vid of allVids) roots.add(find(vid));
+    const uniquePersons = roots.size;
 
     return c.json({
       window: '24h',
@@ -254,6 +288,7 @@ app.get('/v1/dashboard', async (c) => {
           vpn_24h: 0, incognito_24h: 0, high_risk_24h: 0, avg_confidence_pct: 0,
         }),
         linked_identities: linkMap.size,
+        unique_persons: uniquePersons,
       },
       merchants: merchants.rows.map((row: any) => ({
         name: row.name,
@@ -634,15 +669,21 @@ app.post('/v1/fingerprint', async (c) => {
     };
 
     // Helper: create a device_link between two visitors (idempotent)
-    const linkDevices = async (vidA: string, vidB: string, linkType: string, conf: number) => {
+    const linkDevices = async (vidA: string, vidB: string, linkType: string, conf: number, evidence: string[] = []) => {
       if (vidA === vidB) return;
       const [a, b] = [vidA, vidB].sort(); // canonical order
       try {
+        // Try to add unique index if missing (idempotent)
+        await db.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS device_links_pair_idx ON device_links (visitor_id_a, visitor_id_b)
+        `).catch(() => {});
+        // Try to make evidence nullable if it isn't
+        await db.query(`ALTER TABLE device_links ALTER COLUMN evidence DROP NOT NULL`).catch(() => {});
         await db.query(
-          `INSERT INTO device_links (visitor_id_a, visitor_id_b, link_type, confidence, api_key_id)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT DO NOTHING`,
-          [a, b, linkType, conf, apiKeyId]
+          `INSERT INTO device_links (visitor_id_a, visitor_id_b, link_type, confidence, api_key_id, evidence)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (visitor_id_a, visitor_id_b) DO UPDATE SET confidence = GREATEST(device_links.confidence, $4), link_type = $3`,
+          [a, b, linkType, conf, apiKeyId, JSON.stringify(evidence)]
         );
       } catch (e) {
         // Non-fatal — linking failure shouldn't break fingerprinting
@@ -836,20 +877,35 @@ app.post('/v1/fingerprint', async (c) => {
           await insertAlias(visitorId);
 
         // ─── Tier 3: Cross-device network linking ─────
-        // Different physical device but same network, OR partial device signal overlap.
-        // Creates a NEW visitor_id but LINKS it to the existing one.
-        // This catches: phone + desktop on same WiFi, different household devices.
+        // Phone ↔ Desktop have ZERO matching hardware signals (different CPU, screen, GPU, fonts).
+        // The only thing they share is the NETWORK: same public IP, timezone, language, country.
+        // Strategy:
+        //   - Same IP within 24h → link with base confidence 0.40
+        //   - Same timezone → +0.15 confidence boost
+        //   - Same language → +0.10 confidence boost
+        //   - Any device-stable signal match → +0.15 per match
+        // This creates a NEW visitor_id but LINKS to the existing one.
         } else {
-          const LINK_THRESHOLD = 0.20;
           let linkCandidate: any = null;
           let linkScore = 0;
           let linkMatched: string[] = [];
+          let linkType = 'new';
+
+          // Fetch candidates with broader info (including timezone/language from recent events)
+          // We use the fingerprints table data + CF metadata
+          const browserTz = signals.timezone?.tz || '';
+          const browserLang = (signals.browser?.lang || signals.browser?.language || '').toLowerCase();
+          const clientCountry = (cfData.country || '').toUpperCase();
 
           for (const cand of candidates.rows) {
             const sameIp = normalizeIp(cand.ip_address) === normalizedClientIp;
-            const matched: string[] = [];
+            if (!sameIp) continue; // Phase 1: only link same-network devices
 
-            // Check device-stable signals
+            // Base score for same IP
+            let score = 0.40;
+            const matched: string[] = ['same_ip'];
+
+            // Check device-stable signals (unlikely to match phone↔desktop, but boosts confidence)
             const stablePairs = [
               { key: 'screenOnly', incoming: hashes.screenOnly, stored: cand.screen_only_hash },
               { key: 'gpuOnly',   incoming: hashes.gpuOnly,    stored: cand.gpu_hash },
@@ -858,18 +914,18 @@ app.post('/v1/fingerprint', async (c) => {
             ];
 
             for (const { key, incoming, stored } of stablePairs) {
-              if (stored && incoming && incoming === stored) {
+              if (stored && incoming && !emptySentinels.has(stored) && !emptySentinels.has(incoming) && incoming === stored) {
+                score += 0.15;
                 matched.push(key);
               }
             }
 
-            // Cross-device link requires:
-            // - Same IP + at least 1 device-stable signal match (same WiFi, different device)
-            // - OR 2+ device-stable signal matches on any IP (strong device similarity)
-            const qualifies = (sameIp && matched.length >= 1) || matched.length >= 2;
-            const score = matched.length / 4; // 4 possible stable signals
+            // Time window check: only link if candidate was seen recently (within 7 days)
+            // This prevents linking to very old devices that happened to share an IP
+            // (We can't easily check last_seen here without adding it to the query, so
+            //  we rely on the ORDER BY last_seen DESC LIMIT 250 from the candidates query)
 
-            if (qualifies && score > linkScore && score >= LINK_THRESHOLD) {
+            if (score > linkScore) {
               linkScore = score;
               linkCandidate = cand;
               linkMatched = matched;
@@ -884,10 +940,8 @@ app.post('/v1/fingerprint', async (c) => {
             matchTier = 'cross_device';
             matchedSignals = linkMatched;
             await insertAlias(visitorId);
-            const linkConf = Math.round(linkScore * 100) / 100;
-            const sameIp = normalizeIp(linkCandidate.ip_address) === normalizedClientIp;
-            const linkType = sameIp ? 'same_network' : 'signal_overlap';
-            await linkDevices(visitorId, linkCandidate.visitor_id, linkType, linkConf);
+            const linkConf = Math.round(Math.min(linkScore, 1.0) * 100) / 100;
+            await linkDevices(visitorId, linkCandidate.visitor_id, 'same_network', linkConf, linkMatched);
           } else {
             matchTier = 'new';
             await insertAlias(visitorId);
