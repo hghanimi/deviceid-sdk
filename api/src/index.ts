@@ -6,6 +6,28 @@ import { createHash } from 'crypto';
 
 const app = new Hono<{ Bindings: { DATABASE_URL: string } }>();
 
+const normalizeIp = (ip?: string | null): string => {
+  if (!ip) return '';
+  return ip.trim().toLowerCase().replace(/^::ffff:/, '');
+};
+
+const isPrivateIp = (ip?: string | null): boolean => {
+  const value = normalizeIp(ip);
+  if (!value) return true;
+
+  if (value === '127.0.0.1' || value === '0.0.0.0') return true;
+  if (value.startsWith('10.')) return true;
+  if (value.startsWith('192.168.')) return true;
+  if (value.startsWith('169.254.')) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(value)) return true;
+
+  if (value === '::1') return true;
+  if (value.startsWith('fc') || value.startsWith('fd')) return true;
+  if (value.startsWith('fe80:')) return true;
+
+  return false;
+};
+
 app.use('*', cors());
 
 app.use('*', async (c, next) => {
@@ -107,7 +129,13 @@ app.post('/v1/fingerprint', async (c) => {
     // headlessScore is a 0-1 float; cast to 0-100 integer for the INTEGER DB column
     const headlessScoreInt = Math.round((evasion?.headlessScore || 0) * 100);
     const botCount = Object.values(evasion?.bot || {}).filter(Boolean).length;
-    const isVpn = (evasion?.webrtcIPs?.length || 0) > 0;
+    const normalizedClientIp = normalizeIp(clientIp);
+    const webrtcIps: string[] = Array.isArray(evasion?.webrtcIPs)
+      ? evasion.webrtcIPs.map((ip: string) => normalizeIp(ip)).filter(Boolean)
+      : [];
+    const publicWebrtcIps = webrtcIps.filter((ip) => !isPrivateIp(ip));
+    const isVpn = publicWebrtcIps.length > 0
+      && (isPrivateIp(normalizedClientIp) || publicWebrtcIps.some((ip) => ip !== normalizedClientIp));
 
     // ─── Tier 1: Exact composite hash match ───
     let visitorId: string;
