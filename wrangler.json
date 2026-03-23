@@ -1,0 +1,14 @@
+{
+  "build": {
+    "command": "npm run build",
+    "cwd": "/",
+    "destination": "dist"
+  },
+  "env": {
+    "production": {
+      "vars": {
+        "ENVIRONMENT": "production"
+      }
+    }
+  }
+}

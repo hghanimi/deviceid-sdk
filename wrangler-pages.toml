@@ -1,0 +1,13 @@
+name = "deviceid-cdn"
+type = "javascript"
+account_id = "aa303491e6ec0a8273437be1a9e97bad"
+workers_dev = true
+
+# For Pages, this uses build output
+[build]
+command = "npm run build"
+cwd = "./"
+watch_paths = ["src/**/*.js"]
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
