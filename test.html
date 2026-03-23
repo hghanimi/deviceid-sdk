@@ -1,371 +1,498 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Athar Device Intelligence</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet" />
-    <style>
-        :root {
-            --bg: #081018;
-            --panel: #121f2f;
-            --panel-strong: #0f1a27;
-            --accent: #13b67f;
-            --accent-2: #f4a13d;
-            --text: #ecf2f9;
-            --muted: #9cb0c3;
-            --danger: #ff6a6a;
-            --ok: #4be38f;
-            --radius: 18px;
-            --shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wayl Risk Monitoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #081018;
+      --panel: #111e2f;
+      --panel-2: #0d1827;
+      --line: rgba(155, 173, 191, 0.22);
+      --text: #e9f0f8;
+      --muted: #9db0c4;
+      --brand: #18bf86;
+      --warn: #f4a13d;
+      --danger: #ff6f6f;
+      --ok: #4ce395;
+      --radius: 16px;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.38);
+    }
 
-        * { box-sizing: border-box; }
+    * { box-sizing: border-box; }
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            color: var(--text);
-            font-family: "Space Grotesk", "IBM Plex Sans Arabic", sans-serif;
-            background:
-                radial-gradient(1200px 600px at 90% -10%, rgba(19, 182, 127, 0.12), transparent 55%),
-                radial-gradient(900px 500px at -10% 120%, rgba(244, 161, 61, 0.16), transparent 52%),
-                linear-gradient(160deg, #04080d 0%, #0a141f 44%, #111d2d 100%);
-            padding: 24px;
-        }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Space Grotesk", "IBM Plex Sans Arabic", sans-serif;
+      background:
+        radial-gradient(1200px 620px at 90% -8%, rgba(24, 191, 134, 0.14), transparent 55%),
+        radial-gradient(900px 500px at -8% 115%, rgba(244, 161, 61, 0.15), transparent 52%),
+        linear-gradient(155deg, #050a10 0%, #0a1320 45%, #101d2f 100%);
+      padding: 20px;
+    }
 
-        .shell {
-            max-width: 1080px;
-            margin: 0 auto;
-            display: grid;
-            gap: 18px;
-            animation: rise 500ms ease;
-        }
+    .shell {
+      max-width: 1250px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+      animation: show 420ms ease;
+    }
 
-        .hero {
-            background: linear-gradient(130deg, rgba(18, 31, 47, 0.92), rgba(9, 18, 28, 0.95));
-            border: 1px solid rgba(156, 176, 195, 0.2);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 24px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            justify-content: space-between;
-            align-items: flex-end;
-        }
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(145deg, rgba(17, 30, 47, 0.9), rgba(9, 18, 29, 0.95));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: end;
+    }
 
-        .title {
-            margin: 0;
-            font-size: clamp(28px, 4vw, 46px);
-            line-height: 1;
-            letter-spacing: 0.5px;
-        }
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 3.6vw, 44px);
+      line-height: 1;
+      letter-spacing: 0.3px;
+    }
 
-        .subtitle {
-            margin: 8px 0 0;
-            color: var(--muted);
-            max-width: 620px;
-            font-size: 15px;
-        }
+    .sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
 
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(19, 182, 127, 0.15);
-            border: 1px solid rgba(19, 182, 127, 0.45);
-            color: #b5f4dc;
-            padding: 8px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-            letter-spacing: 0.4px;
-            text-transform: uppercase;
-            font-weight: 700;
-        }
+    .badge {
+      border-radius: 999px;
+      border: 1px solid rgba(24, 191, 134, 0.45);
+      background: rgba(24, 191, 134, 0.16);
+      color: #baf7df;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.45px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1.3fr 1fr;
-            gap: 18px;
-        }
+    .controls {
+      border: 1px solid var(--line);
+      background: linear-gradient(160deg, rgba(17, 30, 47, 0.88), rgba(12, 24, 36, 0.92));
+      border-radius: var(--radius);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      box-shadow: var(--shadow);
+    }
 
-        .card {
-            background: linear-gradient(170deg, rgba(18, 31, 47, 0.88), rgba(12, 24, 36, 0.92));
-            border: 1px solid rgba(156, 176, 195, 0.2);
-            border-radius: var(--radius);
-            padding: 20px;
-            box-shadow: var(--shadow);
-        }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 10px;
+      align-items: end;
+    }
 
-        .controls { display: grid; gap: 12px; }
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
 
-        label {
-            display: grid;
-            gap: 6px;
-            font-size: 13px;
-            color: var(--muted);
-        }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(9, 16, 26, 0.78);
+      color: var(--text);
+      font: inherit;
+    }
 
-        input {
-            width: 100%;
-            border: 1px solid rgba(156, 176, 195, 0.32);
-            border-radius: 12px;
-            background: rgba(8, 16, 24, 0.78);
-            color: var(--text);
-            padding: 12px;
-            font: inherit;
-        }
+    button {
+      padding: 11px 14px;
+      border-radius: 12px;
+      border: 0;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
-        .actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 4px;
-        }
+    .btn-primary { background: linear-gradient(135deg, var(--brand), #12a874); color: #062418; }
+    .btn-ghost { background: rgba(157, 176, 196, 0.12); color: var(--text); border: 1px solid var(--line); }
 
-        button {
-            border: 0;
-            border-radius: 12px;
-            padding: 12px 14px;
-            font: inherit;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 120ms ease, opacity 120ms ease;
-        }
+    .status {
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      border: 1px solid rgba(157, 176, 196, 0.2);
+      background: rgba(8, 15, 24, 0.68);
+    }
 
-        button:active { transform: translateY(1px); }
+    .status.ok { color: #bcf8dd; border-color: rgba(76, 227, 149, 0.42); }
+    .status.warn { color: #ffe0b9; border-color: rgba(244, 161, 61, 0.45); }
+    .status.err { color: #ffd0d0; border-color: rgba(255, 111, 111, 0.5); }
 
-        .btn-primary {
-            background: linear-gradient(130deg, var(--accent), #0ea16f);
-            color: #022117;
-            min-width: 180px;
-        }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
 
-        .btn-ghost {
-            background: rgba(156, 176, 195, 0.1);
-            color: var(--text);
-            border: 1px solid rgba(156, 176, 195, 0.24);
-        }
+    .kpi {
+      border: 1px solid var(--line);
+      background: linear-gradient(170deg, rgba(17, 30, 47, 0.88), rgba(12, 24, 36, 0.92));
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+    }
 
-        .status {
-            margin-top: 10px;
-            border-radius: 12px;
-            padding: 12px;
-            border: 1px solid transparent;
-            color: var(--muted);
-            background: rgba(8, 16, 24, 0.6);
-            min-height: 48px;
-        }
+    .kpi .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.55px; }
+    .kpi .v { margin-top: 6px; font-size: 22px; font-weight: 700; }
 
-        .status.loading { border-color: rgba(244, 161, 61, 0.45); color: #ffd8a4; }
-        .status.success { border-color: rgba(75, 227, 143, 0.45); color: #b8f8d0; }
-        .status.error { border-color: rgba(255, 106, 106, 0.55); color: #ffc2c2; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 12px;
+    }
 
-        .metrics {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 8px;
-        }
+    .panel {
+      border: 1px solid var(--line);
+      background: linear-gradient(170deg, rgba(17, 30, 47, 0.88), rgba(12, 24, 36, 0.92));
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
 
-        .metric {
-            background: rgba(8, 16, 24, 0.72);
-            border: 1px solid rgba(156, 176, 195, 0.18);
-            border-radius: 12px;
-            padding: 12px;
-        }
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
 
-        .metric .k {
-            color: var(--muted);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.7px;
-        }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
 
-        .metric .v {
-            margin-top: 6px;
-            font-size: 18px;
-            font-weight: 700;
-            word-break: break-word;
-        }
+    th, td {
+      text-align: left;
+      padding: 8px 6px;
+      border-bottom: 1px solid rgba(157, 176, 196, 0.14);
+      vertical-align: top;
+    }
 
-        .chips {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
+    th { color: var(--muted); font-weight: 600; }
 
-        .chip {
-            border-radius: 999px;
-            padding: 6px 10px;
-            font-size: 12px;
-            border: 1px solid rgba(156, 176, 195, 0.25);
-            background: rgba(8, 16, 24, 0.6);
-            color: #dbe8f4;
-        }
+    .chip {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      border: 1px solid rgba(157, 176, 196, 0.28);
+      background: rgba(8, 16, 24, 0.6);
+      color: #d4e1ee;
+      margin-right: 4px;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
 
-        .chip.ok {
-            border-color: rgba(75, 227, 143, 0.4);
-            color: #b7f7d0;
-        }
+    .chip.bad { border-color: rgba(255, 111, 111, 0.46); color: #ffc8c8; }
+    .chip.ok { border-color: rgba(76, 227, 149, 0.4); color: #bef7d9; }
 
-        .chip.bad {
-            border-color: rgba(255, 106, 106, 0.45);
-            color: #ffc1c1;
-        }
+    .trend {
+      display: grid;
+      gap: 7px;
+      max-height: 270px;
+      overflow: auto;
+    }
 
-        pre {
-            margin: 0;
-            max-height: 380px;
-            overflow: auto;
-            border-radius: 12px;
-            border: 1px solid rgba(156, 176, 195, 0.2);
-            background: rgba(5, 11, 18, 0.86);
-            padding: 14px;
-            font-family: "Consolas", "Courier New", monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            color: #c9d8e7;
-        }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 78px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+    }
 
-        .raw-title {
-            margin: 0 0 10px;
-            font-size: 14px;
-            color: var(--muted);
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
+    .bar-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(157, 176, 196, 0.16);
+      overflow: hidden;
+      border: 1px solid rgba(157, 176, 196, 0.16);
+    }
 
-        @keyframes rise {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+    .bar {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(120deg, var(--brand), var(--warn));
+      transition: width 300ms ease;
+    }
 
-        @media (max-width: 900px) {
-            .grid { grid-template-columns: 1fr; }
-            body { padding: 14px; }
-            .hero, .card { padding: 16px; }
-        }
-    </style>
+    .muted { color: var(--muted); }
+
+    @keyframes show {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1080px) {
+      .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .layout { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .panel, .controls, .hero { padding: 12px; }
+      th:nth-child(4), td:nth-child(4) { display: none; }
+      .bar-row { grid-template-columns: 64px 1fr auto; }
+    }
+  </style>
 </head>
 <body>
-    <main class="shell">
-        <section class="hero">
-            <div>
-                <div class="badge">Athar Device Intelligence</div>
-                <h1 class="title">Live Fingerprint UI</h1>
-                <p class="subtitle">A clean product-style console for testing visitor identity, risk scoring, VPN/incognito signals, and match behavior in real time.</p>
-            </div>
-            <div class="badge">SDK v3 + Worker v3 scoring</div>
-        </section>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <div class="badge">Wayl Operations Console</div>
+        <h1>Merchant Risk Dashboard</h1>
+        <p class="sub">Portfolio monitoring for active merchants using Wayl checkout.</p>
+      </div>
+      <div class="badge" id="generatedAt">Waiting for data</div>
+    </section>
 
-        <section class="grid">
-            <article class="card controls">
-                <label>
-                    API Key
-                    <input id="apiKey" value="pk_live_wayl_001" autocomplete="off" />
-                </label>
-                <label>
-                    API Endpoint
-                    <input id="apiEndpoint" value="https://api.arch-hayder.workers.dev/v1/fingerprint" autocomplete="off" />
-                </label>
+    <section class="controls">
+      <div class="row">
+        <label>
+          Operator API Key
+          <input id="apiKey" value="pk_live_wayl_001" autocomplete="off" />
+        </label>
+        <label>
+          Dashboard Endpoint
+          <input id="endpoint" value="https://api.arch-hayder.workers.dev/v1/dashboard" autocomplete="off" />
+        </label>
+        <button id="refreshBtn" class="btn-primary">Refresh</button>
+        <button id="autoBtn" class="btn-ghost">Auto: OFF</button>
+      </div>
+      <div id="status" class="status">Ready to load portfolio data.</div>
+    </section>
 
-                <div class="actions">
-                    <button class="btn-primary" id="runBtn">Run Identification</button>
-                    <button class="btn-ghost" id="clearBtn">Clear Output</button>
-                </div>
+    <section class="kpis">
+      <article class="kpi"><div class="k">Events (24h)</div><div class="v" id="kEvents">-</div></article>
+      <article class="kpi"><div class="k">Unique Devices</div><div class="v" id="kUnique">-</div></article>
+      <article class="kpi"><div class="k">New Devices</div><div class="v" id="kNew">-</div></article>
+      <article class="kpi"><div class="k">VPN Flags</div><div class="v" id="kVpn">-</div></article>
+      <article class="kpi"><div class="k">Incognito Flags</div><div class="v" id="kIncog">-</div></article>
+      <article class="kpi"><div class="k">High Risk</div><div class="v" id="kRisk">-</div></article>
+    </section>
 
-                <div id="status" class="status">Ready to test the live pipeline.</div>
+    <section class="layout">
+      <article class="panel">
+        <h3>Top Merchants (24h)</h3>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Merchant</th>
+                <th>Events</th>
+                <th>Unique</th>
+                <th>High Risk</th>
+              </tr>
+            </thead>
+            <tbody id="merchantRows">
+              <tr><td colspan="4" class="muted">No data yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
 
-                <div class="metrics">
-                    <div class="metric"><div class="k">Visitor ID</div><div id="mVisitor" class="v">-</div></div>
-                    <div class="metric"><div class="k">Match Tier</div><div id="mTier" class="v">-</div></div>
-                    <div class="metric"><div class="k">Risk Score</div><div id="mRisk" class="v">-</div></div>
-                    <div class="metric"><div class="k">SDK Version</div><div id="mVersion" class="v">-</div></div>
-                </div>
+      <article class="panel">
+        <h3>Events Trend (24h)</h3>
+        <div class="trend" id="trend"></div>
+      </article>
+    </section>
 
-                <div id="riskChips" class="chips"></div>
-            </article>
+    <section class="panel">
+      <h3>Recent Risk Events</h3>
+      <div style="overflow:auto; max-height: 370px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Merchant</th>
+              <th>Visitor</th>
+              <th>IP</th>
+              <th>Signals</th>
+            </tr>
+          </thead>
+          <tbody id="riskRows">
+            <tr><td colspan="5" class="muted">No events yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-            <article class="card">
-                <h3 class="raw-title">Raw Response</h3>
-                <pre id="raw">No response yet.</pre>
-            </article>
-        </section>
-    </main>
+  <script>
+    const el = (id) => document.getElementById(id);
+    let timer = null;
 
-    <script src="https://deviceid-cdn.pages.dev/deviceid.min.js"></script>
-    <script>
-        const el = (id) => document.getElementById(id);
+    function setStatus(type, text) {
+      const node = el('status');
+      node.className = 'status ' + (type || '');
+      node.textContent = text;
+    }
 
-        function setStatus(type, msg) {
-            const node = el('status');
-            node.className = 'status' + (type ? ' ' + type : '');
-            node.textContent = msg;
+    function formatNum(v) {
+      return (v == null ? 0 : Number(v)).toLocaleString();
+    }
+
+    function shortTime(value) {
+      try {
+        return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch (_) {
+        return '-';
+      }
+    }
+
+    function chip(text, bad) {
+      return '<span class="chip ' + (bad ? 'bad' : 'ok') + '">' + text + '</span>';
+    }
+
+    function renderKpis(overview) {
+      el('kEvents').textContent = formatNum(overview.events_24h);
+      el('kUnique').textContent = formatNum(overview.unique_devices_24h);
+      el('kNew').textContent = formatNum(overview.new_devices_24h);
+      el('kVpn').textContent = formatNum(overview.vpn_24h);
+      el('kIncog').textContent = formatNum(overview.incognito_24h);
+      el('kRisk').textContent = formatNum(overview.high_risk_24h);
+    }
+
+    function renderMerchants(merchants) {
+      const tbody = el('merchantRows');
+      if (!merchants || merchants.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">No merchant traffic in this window.</td></tr>';
+        return;
+      }
+
+      const top = merchants.slice(0, 30);
+      tbody.innerHTML = top.map((m) => {
+        return '<tr>' +
+          '<td>' + (m.name || m.publicKey || 'Unknown') + '</td>' +
+          '<td>' + formatNum(m.events24h) + '</td>' +
+          '<td>' + formatNum(m.uniqueDevices24h) + '</td>' +
+          '<td>' + formatNum(m.highRisk24h) + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    function renderTrend(hourly) {
+      const node = el('trend');
+      if (!hourly || hourly.length === 0) {
+        node.innerHTML = '<div class="muted">No trend data yet.</div>';
+        return;
+      }
+
+      const max = Math.max(...hourly.map((x) => Number(x.events) || 0), 1);
+      node.innerHTML = hourly.map((x) => {
+        const w = Math.max(3, Math.round(((Number(x.events) || 0) / max) * 100));
+        return '<div class="bar-row">' +
+          '<span class="muted">' + shortTime(x.hour) + '</span>' +
+          '<div class="bar-track"><div class="bar" style="width:' + w + '%"></div></div>' +
+          '<strong>' + formatNum(x.events) + '</strong>' +
+          '</div>';
+      }).join('');
+    }
+
+    function renderRiskEvents(events) {
+      const tbody = el('riskRows');
+      if (!events || events.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">No risky events in this window.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = events.slice(0, 80).map((e) => {
+        const signalHtml = [
+          chip('VPN', !!e.isVpn),
+          chip('Incognito', !!e.isIncognito),
+          chip('Headless ' + (e.headlessScore ?? 0), Number(e.headlessScore || 0) >= 40),
+          chip('Bot ' + (e.botScore ?? 0), Number(e.botScore || 0) >= 2),
+        ].join(' ');
+
+        return '<tr>' +
+          '<td>' + new Date(e.lastSeen).toLocaleString() + '</td>' +
+          '<td>' + (e.merchantName || 'Unknown') + '</td>' +
+          '<td>' + (e.visitorId || '-') + '</td>' +
+          '<td>' + (e.ipAddress || '-') + '</td>' +
+          '<td>' + signalHtml + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    async function loadDashboard() {
+      const endpoint = el('endpoint').value.trim();
+      const apiKey = el('apiKey').value.trim();
+      if (!endpoint || !apiKey) {
+        setStatus('err', 'API key and endpoint are required.');
+        return;
+      }
+
+      setStatus('warn', 'Loading Wayl portfolio data...');
+
+      try {
+        const response = await fetch(endpoint, { headers: { 'x-api-key': apiKey } });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || ('HTTP ' + response.status));
         }
 
-        function chip(label, active) {
-            const span = document.createElement('span');
-            span.className = 'chip ' + (active ? 'bad' : 'ok');
-            span.textContent = label + ': ' + (active ? 'true' : 'false');
-            return span;
-        }
+        renderKpis(data.overview || {});
+        renderMerchants(data.merchants || []);
+        renderTrend(data.hourly || []);
+        renderRiskEvents(data.riskyEvents || []);
+        el('generatedAt').textContent = 'Updated ' + new Date(data.generatedAt || Date.now()).toLocaleTimeString();
+        setStatus('ok', 'Dashboard updated successfully.');
+      } catch (err) {
+        setStatus('err', 'Failed to load dashboard: ' + (err.message || String(err)));
+      }
+    }
 
-        function renderResult(result) {
-            el('mVisitor').textContent = result.visitorId || '-';
-            el('mTier').textContent = result.matchTier || '-';
-            el('mRisk').textContent = result.riskScore != null ? String(result.riskScore) : '-';
-            el('mVersion').textContent = result.sdkVersion || '-';
-            el('raw').textContent = JSON.stringify(result, null, 2);
+    function toggleAuto() {
+      const btn = el('autoBtn');
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+        btn.textContent = 'Auto: OFF';
+      } else {
+        timer = setInterval(loadDashboard, 30000);
+        btn.textContent = 'Auto: ON';
+        loadDashboard();
+      }
+    }
 
-            const chips = el('riskChips');
-            chips.innerHTML = '';
-            const signals = result.riskSignals || {};
-            chips.appendChild(chip('vpn', !!signals.vpn));
-            chips.appendChild(chip('incognito', !!signals.incognito));
-            chips.appendChild(chip('headless', !!signals.headless));
-            chips.appendChild(chip('bot', !!signals.bot));
-            chips.appendChild(chip('tampered', !!signals.tampered));
-            chips.appendChild(chip('multiAccount', !!signals.multiAccount));
-        }
-
-        async function runIdentify() {
-            const runBtn = el('runBtn');
-            runBtn.disabled = true;
-            setStatus('loading', 'Collecting signals and calling the live API...');
-
-            try {
-                const did = new DeviceID({
-                    apiKey: el('apiKey').value.trim(),
-                    apiEndpoint: el('apiEndpoint').value.trim(),
-                    debug: false,
-                });
-
-                const result = await did.identify();
-                renderResult(result);
-                setStatus('success', 'Identification completed successfully.');
-            } catch (err) {
-                setStatus('error', 'Request failed: ' + (err && err.message ? err.message : 'Unknown error'));
-                el('raw').textContent = err && err.stack ? err.stack : String(err);
-            } finally {
-                runBtn.disabled = false;
-            }
-        }
-
-        el('runBtn').addEventListener('click', runIdentify);
-        el('clearBtn').addEventListener('click', () => {
-            setStatus('', 'Ready to test the live pipeline.');
-            el('mVisitor').textContent = '-';
-            el('mTier').textContent = '-';
-            el('mRisk').textContent = '-';
-            el('mVersion').textContent = '-';
-            el('riskChips').innerHTML = '';
-            el('raw').textContent = 'No response yet.';
-        });
-    </script>
+    el('refreshBtn').addEventListener('click', loadDashboard);
+    el('autoBtn').addEventListener('click', toggleAuto);
+    loadDashboard();
+  </script>
 </body>
 </html>

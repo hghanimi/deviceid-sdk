@@ -93,6 +93,131 @@ app.get('/stats', async (c) => {
   }
 });
 
+app.get('/v1/dashboard', async (c) => {
+  const db = c.get('db') as any;
+  const apiKey = c.get('apiKey') as any;
+
+  // Restrict portfolio-wide monitoring to Wayl operator keys.
+  if (!apiKey?.public_key || !String(apiKey.public_key).startsWith('pk_live_wayl')) {
+    return c.json({ error: 'Dashboard access is restricted to Wayl operator keys.' }, 403);
+  }
+
+  try {
+    const [overview, merchants, riskyEvents, hourly] = await Promise.all([
+      db.query(
+        `SELECT
+           COUNT(*)::int AS events_24h,
+           COUNT(DISTINCT visitor_id)::int AS unique_devices_24h,
+           COUNT(*) FILTER (WHERE first_seen >= NOW() - INTERVAL '24 hours')::int AS new_devices_24h,
+           COUNT(*) FILTER (WHERE is_vpn = true)::int AS vpn_24h,
+           COUNT(*) FILTER (WHERE is_incognito = true)::int AS incognito_24h,
+           COUNT(*) FILTER (
+             WHERE is_vpn = true
+                OR is_incognito = true
+                OR headless_score >= 40
+                OR bot_score >= 2
+           )::int AS high_risk_24h
+         FROM fingerprints
+         WHERE last_seen >= NOW() - INTERVAL '24 hours'`
+      ),
+      db.query(
+        `SELECT
+           k.name,
+           k.public_key,
+           COUNT(f.*)::int AS events_24h,
+           COUNT(DISTINCT f.visitor_id)::int AS unique_devices_24h,
+           COUNT(*) FILTER (
+             WHERE f.is_vpn = true
+                OR f.is_incognito = true
+                OR f.headless_score >= 40
+                OR f.bot_score >= 2
+           )::int AS high_risk_24h
+         FROM api_keys k
+         LEFT JOIN fingerprints f
+           ON f.api_key_id = k.id
+          AND f.last_seen >= NOW() - INTERVAL '24 hours'
+         WHERE k.is_active = true
+         GROUP BY k.name, k.public_key
+         ORDER BY events_24h DESC, unique_devices_24h DESC
+         LIMIT 100`
+      ),
+      db.query(
+        `SELECT
+           f.visitor_id,
+           f.last_seen,
+           f.ip_address,
+           f.is_vpn,
+           f.is_incognito,
+           f.headless_score,
+           f.bot_score,
+           f.visit_count,
+           k.name AS merchant_name,
+           k.public_key
+         FROM fingerprints f
+         JOIN api_keys k ON k.id = f.api_key_id
+         WHERE f.last_seen >= NOW() - INTERVAL '24 hours'
+           AND (
+             f.is_vpn = true
+             OR f.is_incognito = true
+             OR f.headless_score >= 40
+             OR f.bot_score >= 2
+           )
+         ORDER BY f.last_seen DESC
+         LIMIT 80`
+      ),
+      db.query(
+        `SELECT
+           DATE_TRUNC('hour', last_seen) AS hour_bucket,
+           COUNT(*)::int AS events,
+           COUNT(DISTINCT visitor_id)::int AS unique_devices
+         FROM fingerprints
+         WHERE last_seen >= NOW() - INTERVAL '24 hours'
+         GROUP BY hour_bucket
+         ORDER BY hour_bucket ASC`
+      ),
+    ]);
+
+    return c.json({
+      window: '24h',
+      generatedAt: new Date().toISOString(),
+      overview: overview.rows[0] || {
+        events_24h: 0,
+        unique_devices_24h: 0,
+        new_devices_24h: 0,
+        vpn_24h: 0,
+        incognito_24h: 0,
+        high_risk_24h: 0,
+      },
+      merchants: merchants.rows.map((row: any) => ({
+        name: row.name,
+        publicKey: row.public_key,
+        events24h: row.events_24h,
+        uniqueDevices24h: row.unique_devices_24h,
+        highRisk24h: row.high_risk_24h,
+      })),
+      riskyEvents: riskyEvents.rows.map((row: any) => ({
+        visitorId: row.visitor_id,
+        merchantName: row.merchant_name,
+        publicKey: row.public_key,
+        ipAddress: row.ip_address,
+        isVpn: row.is_vpn,
+        isIncognito: row.is_incognito,
+        headlessScore: row.headless_score,
+        botScore: row.bot_score,
+        visitCount: row.visit_count,
+        lastSeen: row.last_seen,
+      })),
+      hourly: hourly.rows.map((row: any) => ({
+        hour: row.hour_bucket,
+        events: row.events,
+        uniqueDevices: row.unique_devices,
+      })),
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Dashboard query failed', details: err.message }, 500);
+  }
+});
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FINGERPRINT ENDPOINT — v3 with weighted matching
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
