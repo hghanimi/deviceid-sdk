@@ -794,18 +794,29 @@ class DeviceID {
   _detectPrivate() {
     return new Promise(async function (resolve) {
       var score = 0;
+      var ua = navigator.userAgent || '';
+      var isChromeFamily = /Chrome|CriOS|Edg\//.test(ua) && !/Firefox|FxiOS/.test(ua);
+      var isFirefox = /Firefox|FxiOS/.test(ua);
+      var isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
 
+      // ── CHECK 1: Storage Quota (Chrome incognito caps to ~60% of normal) ──
       try {
         if (navigator.storage && navigator.storage.estimate) {
           var est = await navigator.storage.estimate();
           var quota = est && est.quota ? est.quota : 0;
-          var ua = navigator.userAgent || '';
-          var isChromeFamily = /Chrome|CriOS|Edg\//.test(ua) && !/Firefox|FxiOS/.test(ua);
-          var lowQuotaThreshold = (navigator.deviceMemory || 4) <= 2 ? 120000000 : 320000000;
-          if (isChromeFamily && quota > 0 && quota < lowQuotaThreshold) score += 2;
+          // Chrome incognito: quota is significantly lower (varies by device)
+          // Normal Chrome: usually 50%+ of disk space (tens to hundreds of GB)
+          // Incognito Chrome: capped around 2-5 GB on most systems
+          if (isChromeFamily && quota > 0 && quota < 6000000000) score += 2;
+          // Safari private: storage persist API throws or quota is 0
+          if (isSafari && quota === 0) score += 2;
         }
-      } catch (e) {}
+      } catch (e) {
+        // Safari private-mode throws on storage.estimate()
+        if (isSafari) score += 2;
+      }
 
+      // ── CHECK 2: FileSystem API (legacy Chrome detection, still works on some) ──
       try {
         var fs = window.RequestFileSystem || window.webkitRequestFileSystem;
         if (fs) {
@@ -816,6 +827,45 @@ class DeviceID {
         }
       } catch (e) {}
 
+      // ── CHECK 3: navigator.storage.persist() behavior ──
+      // In incognito, persist() always resolves false (cannot grant persistence)
+      try {
+        if (navigator.storage && navigator.storage.persist) {
+          var persisted = await navigator.storage.persist();
+          if (!persisted) score += 1;
+        }
+      } catch (e) {
+        score += 1;
+      }
+
+      // ── CHECK 4: Cache storage write test ──
+      // Some private mode implementations restrict CacheStorage
+      try {
+        if (typeof caches !== 'undefined') {
+          var testName = '__athar_prv_' + Date.now();
+          var cache = await caches.open(testName);
+          await cache.put(new Request('/__t'), new Response('t'));
+          await caches.delete(testName);
+        }
+      } catch (e) {
+        // CacheStorage restriction → likely private
+        score += 2;
+      }
+
+      // ── CHECK 5: Firefox-specific ServiceWorker registration test ──
+      // Firefox private blocks service worker registration
+      try {
+        if (isFirefox && navigator.serviceWorker) {
+          var reg = await navigator.serviceWorker.getRegistrations();
+          // If zero registrations on a site that should have one, could be private
+          // But more reliable: the serviceWorker controller is null in private
+          if (!navigator.serviceWorker.controller && reg.length === 0) score += 1;
+        }
+      } catch (e) {
+        if (isFirefox) score += 2;
+      }
+
+      // ── CHECK 6: IndexedDB create test (still catches some Safari/Firefox) ──
       try {
         var idbBlocked = await new Promise(function (done) {
           if (typeof indexedDB === 'undefined') {
@@ -851,6 +901,17 @@ class DeviceID {
         });
 
         if (idbBlocked) score += 1;
+      } catch (e) {}
+
+      // ── CHECK 7: Performance memory (Chrome) ──
+      // In incognito, jsHeapSizeLimit is often lower
+      try {
+        if (isChromeFamily && performance && performance.memory) {
+          var heapLimit = performance.memory.jsHeapSizeLimit || 0;
+          // Normal Chrome: typically 4+ GB heap limit
+          // Incognito Chrome: sometimes reduced to ~2 GB
+          if (heapLimit > 0 && heapLimit < 2500000000) score += 1;
+        }
       } catch (e) {}
 
       resolve(score >= 2);
