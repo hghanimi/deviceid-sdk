@@ -844,27 +844,53 @@ app.post('/v1/fingerprint', async (c) => {
 
     const finalIsVpn = isVpn || vpnByIpRotation || vpnByIpSwitch;
 
-    // ─── Risk scoring (cumulative — inherits from linked devices) ───
+    // ─── Risk scoring (contextual — VPN alone ≠ risky) ───
+    // Philosophy: normal people use VPNs, incognito, new devices.
+    // Risk = evasion INTENT, measured by combining multiple signals.
     let riskScore = 0;
-    if (isNew && linkedVids.length === 0) riskScore += 15;   // truly new, no links
-    if (finalIsVpn)                        riskScore += 25;
-    if (evasion?.isPrivate)                riskScore += 20;
-    if ((evasion?.headlessScore || 0) > 0.4) riskScore += 30;
-    if (botCount > 0)                      riskScore += 35;
-    if (linkedResult.rows.length > 3)      riskScore += 15;   // multi-device cluster
+
+    // Count evasion layers — risk compounds when stacked
+    const evasionLayers =
+      (finalIsVpn ? 1 : 0) +
+      (evasion?.isPrivate ? 1 : 0) +
+      (ipChanged ? 1 : 0) +
+      (botCount > 0 ? 1 : 0) +
+      ((evasion?.headlessScore || 0) > 0.4 ? 1 : 0);
+
+    // ── VPN: only risky when combined with other evasion ──
+    if (finalIsVpn) {
+      if (evasionLayers >= 3)        riskScore += 25;  // VPN + incognito + bot/headless = serious
+      else if (evasionLayers >= 2)   riskScore += 15;  // VPN + one other signal = moderate
+      else                           riskScore += 5;   // VPN alone = negligible (normal user)
+    }
+
+    // ── Incognito: same logic — alone is fine ──
+    if (evasion?.isPrivate) {
+      if (evasionLayers >= 3)        riskScore += 20;
+      else if (evasionLayers >= 2)   riskScore += 10;
+      else                           riskScore += 3;   // incognito alone = negligible
+    }
+
+    // ── Hard signals — these ARE inherently suspicious ──
+    if ((evasion?.headlessScore || 0) > 0.4) riskScore += 30;  // headless browser
+    if (botCount > 0)                        riskScore += 35;  // bot behavior
     const tampering = evasion?.tampering || {};
     if (tampering.canvasOverride)    riskScore += 20;
     if (tampering.uaOverride)        riskScore += 15;
     if (tampering.navigatorProxy)    riskScore += 20;
     if (tampering.genericRenderer)   riskScore += 10;
     if (tampering.screenMismatch)    riskScore += 15;
-    // Inherited risk from linked devices
-    if (linkedRiskFlags.vpn)         riskScore += 15;
-    if (linkedRiskFlags.bot)         riskScore += 20;
-    if (linkedRiskFlags.headless)    riskScore += 15;
-    if (linkedRiskFlags.incognito)   riskScore += 10;
-    // IP change without VPN detection = suspicious
-    if (ipChanged && !finalIsVpn)    riskScore += 10;
+
+    // ── Contextual signals ──
+    if (linkedResult.rows.length > 3)      riskScore += 10;   // large device cluster
+    if (ipChanged && !finalIsVpn)          riskScore += 10;   // IP changed without VPN = sus
+    if (isNew && evasionLayers >= 2)       riskScore += 10;   // new + hiding = sus
+    // New device alone = 0 risk (everyone is new once)
+
+    // Inherited risk from linked devices (reduced weights)
+    if (linkedRiskFlags.bot)         riskScore += 15;
+    if (linkedRiskFlags.headless)    riskScore += 10;
+    if (linkedRiskFlags.vpn && linkedRiskFlags.incognito) riskScore += 10; // linked device was hiding
     riskScore = Math.min(100, Math.max(0, riskScore));
 
     // ─── Log every visit to the events table (audit trail) ───
