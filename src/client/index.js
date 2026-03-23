@@ -1,231 +1,279 @@
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { Client } from 'pg';
-import { nanoid } from 'nanoid';
+/**
+ * DeviceID Browser SDK
+ * Collects browser signals and identifies unique devices
+ * @version 1.0.0
+ */
 
-// Assuming you have adapted these to be edge-compatible (no Node-specific APIs)
-import SignalHasher from '../server/services/Hasher';
-import FuzzyMatcher from '../server/matcher';
-import IdentityGraph from '../server/services/graph';
-
-const app = new Hono();
-
-// ═══════════════════════════════════════════
-// GLOBAL STATE & MIDDLEWARE
-// ═══════════════════════════════════════════
-
-// Note: In Workers, memory is per-isolate (edge node). 
-// This rate limiter will limit per datacenter, not globally. 
-// For a true global rate limit, use Cloudflare Rate Limiting rules or Durable Objects.
-const rateLimitMap = new Map();
-
-app.use('*', cors());
-
-// Inject DB and Services into the request context
-app.use('*', async (c, next) => {
-  // Use Cloudflare Hyperdrive connection string mapped to env.DATABASE_URL
-  const client = new Client({ connectionString: c.env.DATABASE_URL });
-  await client.connect();
-
-  const db = {
-    query: (text, params) => client.query(text, params),
-  };
-
-  c.set('db', db);
-  c.set('matcher', new FuzzyMatcher(db));
-  c.set('graph', new IdentityGraph(db));
-
-  await next();
-
-  // Clean up DB connection after response is sent
-  c.executionCtx.waitUntil(client.end());
-});
-
-// Authentication Middleware
-async function authenticate(c, next) {
-  const apiKey = c.req.header('x-api-key');
-  if (!apiKey) return c.json({ error: 'Missing API key' }, 401);
-
-  const db = c.get('db');
-  try {
-    const result = await db.query(
-      'SELECT * FROM api_keys WHERE public_key = $1 AND is_active = true',
-      [apiKey]
-    );
-    if (result.rows.length === 0) {
-      return c.json({ error: 'Invalid API key' }, 401);
-    }
-    c.set('apiKey', result.rows[0]);
-    await next();
-  } catch (err) {
-    console.error('Auth error:', err);
-    return c.json({ error: 'Authentication failed' }, 500);
-  }
-}
-
-// Rate Limiting Middleware
-async function rateLimit(c, next) {
-  const apiKey = c.get('apiKey');
-  const key = apiKey.id;
-  const now = Date.now();
-  const windowMs = 60000; // 1 minute
-  const limit = apiKey.rate_limit || 1000;
-
-  if (!rateLimitMap.has(key)) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
-    return await next();
+class DeviceID {
+  constructor(options = {}) {
+    this.apiKey = options.apiKey;
+    this.apiEndpoint = options.apiEndpoint || 'https://api.arch-hayder.workers.dev/v1/fingerprint';
+    this.debug = options.debug || false;
   }
 
-  const entry = rateLimitMap.get(key);
-  if (now > entry.resetAt) {
-    entry.count = 1;
-    entry.resetAt = now + windowMs;
-    return await next();
-  }
+  /**
+   * Main method: collect signals and identify device
+   */
+  async identify() {
+    try {
+      const signals = await this.collectSignals();
+      if (this.debug) console.log('Collected signals:', signals);
 
-  entry.count++;
-  if (entry.count > limit) {
-    c.header('Retry-After', Math.ceil((entry.resetAt - now) / 1000).toString());
-    return c.json({
-      error: 'Rate limit exceeded',
-      retryAfter: Math.ceil((entry.resetAt - now) / 1000),
-    }, 429);
-  }
+      const response = await fetch(this.apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+        body: JSON.stringify(signals),
+      });
 
-  await next();
-}
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
 
-// ═══════════════════════════════════════════
-// ROUTES
-// ═══════════════════════════════════════════
-
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', version: '1.0.0', edge: true });
-});
-
-app.post('/v1/fingerprint', authenticate, rateLimit, async (c) => {
-  const startTime = Date.now();
-  
-  try {
-    const signals = await c.req.json();
-    const apiKey = c.get('apiKey');
-    const apiKeyId = apiKey.id;
-    const clientIp = c.req.header('CF-Connecting-IP') || '0.0.0.0';
-    
-    const db = c.get('db');
-    const matcher = c.get('matcher');
-    const graph = c.get('graph');
-
-    // 1. Hash signals
-    const hashes = SignalHasher.hashSignals(signals);
-
-    // 2. Find or create visitor
-    const matchResult = await matcher.findMatch(hashes, signals.storedIds, apiKeyId);
-    let visitorId;
-
-    if (matchResult.isNew) {
-      visitorId = `dvc_${nanoid(16)}`;
-
-      await db.query(`
-        INSERT INTO fingerprints
-          (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
-           screen_hash, font_hash, browser_hash, hardware_hash,
-           ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-      `, [
-        visitorId, hashes.composite,
-        hashes.canvas, hashes.webgl, hashes.audio,
-        hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
-        clientIp,
-        (signals.evasion?.webrtcIPs?.length || 0) > 0,
-        signals.evasion?.isPrivate || false,
-        signals.evasion?.headlessScore || 0,
-        Object.values(signals.evasion?.bot || {}).filter(Boolean).length,
-        apiKeyId,
-      ]);
-    } else {
-      visitorId = matchResult.visitorId;
-
-      await db.query(`
-        UPDATE fingerprints
-        SET last_seen = NOW(), visit_count = visit_count + 1,
-            raw_hash = $1, ip_address = $2
-        WHERE visitor_id = $3 AND api_key_id = $4
-      `, [hashes.composite, clientIp, visitorId, apiKeyId]);
-
-      // Cross-browser linking
-      if (matchResult.matchType === 'fuzzy' && matchResult.matchedSignals) {
-        const crossBrowser = !matchResult.matchedSignals.includes('browser')
-          && matchResult.matchedSignals.includes('canvas')
-          && matchResult.matchedSignals.includes('webgl');
-
-        if (crossBrowser && matchResult.originalVisitorId) {
-          await graph.linkDevices(
-            visitorId, matchResult.originalVisitorId,
-            'cross_browser', matchResult.confidence,
-            { matchedSignals: matchResult.matchedSignals },
-            apiKeyId
-          );
+      const result = await response.json();
+      
+      // Store visitor ID for future requests
+      if (result.visitorId) {
+        try {
+          localStorage.setItem('deviceid_visitor_id', result.visitorId);
+          sessionStorage.setItem('deviceid_visitor_id', result.visitorId);
+        } catch (e) {
+          // Storage may be disabled in private mode
         }
       }
+
+      return result;
+    } catch (err) {
+      console.error('DeviceID.identify() error:', err);
+      throw err;
     }
-
-    // 3. Check linked devices
-    const linkedDevices = await graph.getLinkedDevices(visitorId, apiKeyId);
-
-    // 4. Calculate risk score
-    const riskScore = calculateRiskScore({
-      isNew: matchResult.isNew,
-      isVpn: (signals.evasion?.webrtcIPs?.length || 0) > 0,
-      isIncognito: signals.evasion?.isPrivate || false,
-      headlessScore: signals.evasion?.headlessScore || 0,
-      botScore: Object.values(signals.evasion?.bot || {}).filter(Boolean).length,
-      deviceCount: linkedDevices.length,
-      matchConfidence: matchResult.confidence || 0,
-    });
-
-    const processingTime = Date.now() - startTime;
-
-    return c.json({
-      visitorId,
-      isNew: matchResult.isNew,
-      confidence: matchResult.confidence || 1.0,
-      riskScore,
-      linkedDevices: (linkedDevices || []).map(d => ({
-        visitorIdA: d.visitor_id_a,
-        visitorIdB: d.visitor_id_b,
-        linkType: d.link_type,
-        confidence: d.confidence,
-        linkedAt: d.created_at,
-      })),
-      processingTimeMs: processingTime,
-    }, 200);
-  } catch (err) {
-    console.error('Fingerprint error:', err);
-    return c.json({ error: 'Failed to process fingerprint', details: err.message }, 500);
   }
-});
 
-// Helper function to calculate risk score
-function calculateRiskScore(factors) {
-  let score = 0;
-  if (factors.isNew) score += 20;
-  if (factors.isVpn) score += 30;
-  if (factors.isIncognito) score += 25;
-  if (factors.headlessScore > 0.5) score += 35;
-  if (factors.botScore > 0) score += 40;
-  if (factors.deviceCount > 3) score += 15;
-  
-  // Reduce score if we have high match confidence
-  if (factors.matchConfidence > 0.85) score -= 10;
-  
-  return Math.min(100, Math.max(0, score));
+  /**
+   * Collect all browser signals
+   */
+  async collectSignals() {
+    return {
+      canvas: this.getCanvasFingerprint(),
+      webgl: this.getWebGLFingerprint(),
+      audio: await this.getAudioFingerprint(),
+      screen: this.getScreenInfo(),
+      fonts: this.getInstalledFonts(),
+      browser: this.getBrowserInfo(),
+      hardware: this.getHardwareInfo(),
+      evasion: {
+        headlessScore: this.detectHeadless(),
+        isPrivate: await this.detectPrivate(),
+        webrtcIPs: [],
+        bot: this.detectBot(),
+      },
+      storedIds: this.getStoredIds(),
+    };
+  }
+
+  /**
+   * Canvas fingerprinting
+   */
+  getCanvasFingerprint() {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 200;
+      canvas.height = 50;
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px "Arial"';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#f60';
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = '#069';
+      ctx.fillText('DeviceID', 2, 15);
+      ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+      ctx.fillText('DeviceID', 4, 17);
+      return canvas.toDataURL().substring(0, 100); // first 100 chars
+    } catch (e) {
+      return 'canvas_error';
+    }
+  }
+
+  /**
+   * WebGL fingerprinting
+   */
+  getWebGLFingerprint() {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (!gl) return 'webgl_unavailable';
+      const renderer = gl.getParameter(gl.RENDERER);
+      const vendor = gl.getParameter(gl.VENDOR);
+      return `${vendor}:${renderer}`.substring(0, 100);
+    } catch (e) {
+      return 'webgl_error';
+    }
+  }
+
+  /**
+   * Audio fingerprinting
+   */
+  async getAudioFingerprint() {
+    try {
+      const audioContext = window.AudioContext || window.webkitAudioContext;
+      if (!audioContext) return 'audio_unavailable';
+      
+      const ctx = new audioContext();
+      const oscillator = ctx.createOscillator();
+      const analyser = ctx.createAnalyser();
+      const scriptProcessor = ctx.createScriptProcessor(4096, 1, 1);
+      
+      oscillator.connect(analyser);
+      analyser.connect(scriptProcessor);
+      scriptProcessor.connect(ctx.destination);
+      oscillator.start(0);
+      
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      oscillator.stop();
+      
+      return Array.from(data.slice(0, 20)).join(',');
+    } catch (e) {
+      return 'audio_error';
+    }
+  }
+
+  /**
+   * Screen info
+   */
+  getScreenInfo() {
+    return {
+      width: screen.width,
+      height: screen.height,
+      colorDepth: screen.colorDepth,
+      pixelDepth: screen.pixelDepth,
+      devicePixelRatio: window.devicePixelRatio || 1,
+    };
+  }
+
+  /**
+   * Detect installed fonts
+   */
+  getInstalledFonts() {
+    const testFonts = ['Arial', 'Verdana', 'Georgia', 'Times New Roman', 'Courier New', 'Comic Sans MS'];
+    const baseFonts = ['monospace', 'sans-serif', 'serif'];
+    const detected = [];
+    
+    for (const font of testFonts) {
+      try {
+        for (const baseFont of baseFonts) {
+          const el = document.createElement('span');
+          el.style.fontFamily = `"${font}", ${baseFont}`;
+          el.style.fontSize = '14px';
+          el.textContent = 'mmmmmmmmmmlli';
+          el.style.visibility = 'hidden';
+          el.style.position = 'absolute';
+          document.body.appendChild(el);
+          const width = el.offsetWidth;
+          el.remove();
+          
+          if (width > 0 && width !== 100) {
+            detected.push(font);
+            break;
+          }
+        }
+      } catch (e) {
+        // continue
+      }
+    }
+    return detected;
+  }
+
+  /**
+   * Browser info
+   */
+  getBrowserInfo() {
+    return {
+      userAgent: navigator.userAgent.substring(0, 100),
+      language: navigator.language,
+      platform: navigator.platform,
+      pluginCount: (navigator.plugins || []).length,
+    };
+  }
+
+  /**
+   * Hardware info
+   */
+  getHardwareInfo() {
+    return {
+      cores: navigator.hardwareConcurrency || 0,
+      memory: navigator.deviceMemory || 0,
+      maxTouchPoints: navigator.maxTouchPoints || 0,
+    };
+  }
+
+  /**
+   * Detect headless browser
+   */
+  detectHeadless() {
+    let score = 0;
+    if (!window.chrome) score += 0.25;
+    if (navigator.webdriver) score += 0.5;
+    if (!navigator.permissions || !navigator.permissions.query) score += 0.25;
+    return Math.min(1, score);
+  }
+
+  /**
+   * Detect private/incognito mode
+   */
+  async detectPrivate() {
+    try {
+      const fs = window.RequestFileSystem || window.webkitRequestFileSystem;
+      if (!fs) return false;
+      
+      return new Promise(resolve => {
+        fs(window.TEMPORARY, 1, 
+          () => resolve(false),  // Regular mode
+          () => resolve(true)    // Private mode
+        );
+      });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Detect bot
+   */
+  detectBot() {
+    return {
+      phantom: !!window.callPhantom,
+      headless: !!navigator.webdriver,
+      zombie: !!window.__nightmare,
+    };
+  }
+
+  /**
+   * Get stored IDs from previous visits
+   */
+  getStoredIds() {
+    try {
+      return {
+        localStorage: localStorage.getItem('deviceid_visitor_id') || undefined,
+        sessionStorage: sessionStorage.getItem('deviceid_visitor_id') || undefined,
+      };
+    } catch {
+      return {};
+    }
+  }
 }
 
-// Health check for readiness
-app.get('/ready', (c) => {
-  return c.json({ ready: true });
-});
+// Export for module systems
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = DeviceID;
+}
 
-// Export for Cloudflare Worker entry point
-export default app;
+// For IIFE bundle (global)
+if (typeof window !== 'undefined') {
+  window.DeviceID = DeviceID;
+}
+
+export default DeviceID;

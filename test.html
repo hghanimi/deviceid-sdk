@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeviceID SDK Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background: #f0f7ff;
+            border-radius: 4px;
+        }
+        .status.loading {
+            border-left-color: #ffc107;
+            background: #fff8f0;
+        }
+        .status.success {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        .status.error {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        pre {
+            background: #f8f8f8;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .response {
+            margin-top: 20px;
+        }
+        .info {
+            background: #f0f7ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+        .error-text {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success-text {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 DeviceID SDK Test</h1>
+        
+        <div class="info">
+            <strong>API Endpoint:</strong> https://api.arch-hayder.workers.dev<br>
+            <strong>SDK Version:</strong> 1.0.0<br>
+            <strong>API Key:</strong> pk_live_wayl_001 (test key)
+        </div>
+
+        <button class="button" onclick="testIdentify()" id="testBtn">
+            Run Device Identification Test
+        </button>
+
+        <div id="status"></div>
+        <div id="response" class="response"></div>
+    </div>
+
+    <!-- Load SDK from local dist for testing -->
+    <script src="./deviceid.min.js"></script>
+    
+    <script>
+        async function testIdentify() {
+            const testBtn = document.getElementById('testBtn');
+            const statusDiv = document.getElementById('status');
+            const responseDiv = document.getElementById('response');
+            
+            testBtn.disabled = true;
+            
+            statusDiv.className = 'status loading';
+            statusDiv.innerHTML = '⏳ Collecting browser signals and identifying device...';
+            responseDiv.innerHTML = '';
+            
+            try {
+                // Initialize SDK with test API key
+                const did = new DeviceID({
+                    apiKey: 'pk_live_wayl_001',
+                    debug: true
+                });
+                
+                // Identify device
+                const result = await did.identify();
+                
+                // Show success
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '<span class="success-text">✅ Device identified successfully!</span>';
+                
+                // Display response
+                responseDiv.innerHTML = '<h3>Response Data:</h3><pre>' + 
+                    JSON.stringify(result, null, 2) + 
+                    '</pre>';
+                
+                // Check for risk signals
+                if (result.riskScore > 50) {
+                    responseDiv.innerHTML += '<p style="color: #ff9800;"><strong>⚠️ Warning:</strong> Risk score is elevated (' + result.riskScore + '/100)</p>';
+                }
+                
+                // Check if new device
+                if (result.isNew) {
+                    responseDiv.innerHTML += '<p style="color: #007bff;"><strong>ℹ️ Info:</strong> This is a new device or first visit</p>';
+                } else {
+                    responseDiv.innerHTML += '<p style="color: #28a745;"><strong>✓ Info:</strong> Device has been seen before</p>';
+                }
+                
+                // Device links if any
+                if (result.linkedDevices && result.linkedDevices.length > 0) {
+                    responseDiv.innerHTML += '<p><strong>🔗 Linked Devices:</strong> ' + result.linkedDevices.length + ' device(s) linked to this identity</p>';
+                }
+                
+            } catch (err) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '<span class="error-text">❌ Error: ' + err.message + '</span>';
+                responseDiv.innerHTML = '<h3>Error Details:</h3><pre>' + err.stack + '</pre>';
+                console.error('Test failed:', err);
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+        
+        // Auto-test on page load (optional)
+        // window.addEventListener('load', () => {
+        //     setTimeout(() => testIdentify(), 500);
+        // });
+    </script>
+</body>
+</html>
