@@ -411,22 +411,50 @@ app.post('/v1/fingerprint', async (c) => {
       : [];
     const publicWebrtcIps = webrtcIps.filter((ip) => !isPrivateIp(ip));
 
-    // VPN detection: only compare IPs of the SAME protocol family.
-    // CF-Connecting-IP may be IPv6 while WebRTC STUN resolves via IPv4 — that is NOT a VPN,
-    // it's just a dual-stack network. If no same-protocol IPs exist we cannot determine mismatch.
-    // Also guard against missing/fallback client IP (0.0.0.0) which must never trigger a VPN flag.
-    let isVpn = false;
+    // ─── VPN DETECTION (multi-signal) ───
+    // Signal 1: Timezone mismatch between browser and IP geolocation.
+    //   Cloudflare's request.cf gives us the IANA timezone of the connecting IP.
+    //   The SDK sends the browser's real timezone. If they disagree, traffic is tunnelled.
+    //   This catches ALL VPNs — even those that perfectly tunnel WebRTC.
+    const cfData = (c.req.raw as any).cf || {};
+    const ipTimezone: string = (cfData.timezone || '').toLowerCase();
+    const browserTimezone: string = (signals.timezone?.tz || '').toLowerCase();
+    const ipCountry: string = (cfData.country || '').toUpperCase();
+
+    let vpnScore = 0;
+
+    // (a) Timezone mismatch — strongest signal
+    if (ipTimezone && browserTimezone && ipTimezone !== browserTimezone) {
+      vpnScore += 3;
+    }
+
+    // (b) Known VPN / datacenter ASN keywords
+    const asOrg: string = (cfData.asOrganization || '').toLowerCase();
+    const vpnAsKeywords = [
+      'nordvpn', 'expressvpn', 'surfshark', 'cyberghost', 'mullvad', 'protonvpn',
+      'private internet', 'purevpn', 'ipvanish', 'hotspot shield', 'windscribe',
+      'torguard', 'hide.me', 'tunnelbear',
+      // Common datacenter providers (IPs never used by real ISPs)
+      'ovh', 'hetzner', 'digitalocean', 'digital ocean', 'vultr', 'linode',
+      'choopa', 'M247', 'm247', 'datacamp', 'psychz',
+    ];
+    if (asOrg && vpnAsKeywords.some((kw) => asOrg.includes(kw))) {
+      vpnScore += 3;
+    }
+
+    // (c) Classic WebRTC leak — same-protocol IP mismatch
     if (normalizedClientIp && normalizedClientIp !== '0.0.0.0' && !isPrivateIp(normalizedClientIp)) {
       const clientIsIPv4 = isIPv4(normalizedClientIp);
       const sameProtoWebrtcIps = publicWebrtcIps.filter((ip) =>
         clientIsIPv4 ? isIPv4(ip) : isIPv6(ip)
       );
-      // Flag VPN only if we have at least one same-protocol WebRTC IP and NONE of them
-      // matches the CF-observed IP (indicating all traffic is tunnelled).
       if (sameProtoWebrtcIps.length > 0 && sameProtoWebrtcIps.every((ip) => ip !== normalizedClientIp)) {
-        isVpn = true;
+        vpnScore += 2;
       }
     }
+
+    // Threshold: score ≥ 2 = VPN. Any single strong signal (timezone mismatch OR datacenter ASN) is enough.
+    let isVpn = vpnScore >= 2;
 
     // ─── Tier 1: Exact composite hash match ───
     let visitorId: string;
