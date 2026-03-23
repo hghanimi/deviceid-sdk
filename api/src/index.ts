@@ -94,7 +94,7 @@ app.get('/stats', async (c) => {
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// FINGERPRINT ENDPOINT — v2 with weighted matching
+// FINGERPRINT ENDPOINT — v3 with weighted matching
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 app.post('/v1/fingerprint', async (c) => {
   const startTime = Date.now();
@@ -115,7 +115,7 @@ app.post('/v1/fingerprint', async (c) => {
     // Build stable composite — exclude volatile/session-specific fields
     const { storedIds, ts, collectionMs, v, evasion, ...stableCore } = signals;
 
-    const hashes = {
+    const legacyHashes = {
       composite: h(stableCore),
       canvas:    h(signals.canvas),
       webgl:     h(signals.webgl),
@@ -124,6 +124,40 @@ app.post('/v1/fingerprint', async (c) => {
       fonts:     h(signals.fonts),
       browser:   h(signals.browser),
       hardware:  h(signals.hardware),
+    };
+
+    // v3-enhanced grouped hashes (stored in existing DB columns, no schema migration needed)
+    const hashes = {
+      composite: legacyHashes.composite,
+      canvas: h(signals.canvas),
+      webgl: h({
+        webgl: signals.webgl,
+        webglRender: signals.webglRender,
+      }),
+      audio: h(signals.audio),
+      screen: h({
+        screen: signals.screen,
+        clientRects: signals.clientRects,
+      }),
+      fonts: h({
+        fonts: signals.fonts,
+        arabicFonts: signals.arabicFonts,
+      }),
+      browser: h({
+        browser: signals.browser,
+        timezone: signals.timezone,
+        intlProbe: signals.intlProbe,
+        voices: signals.voices,
+        permissions: signals.permissions,
+        cssSupports: signals.cssSupports,
+        codecs: signals.codecs,
+        storageQuota: signals.storageQuota,
+      }),
+      hardware: h({
+        hardware: signals.hardware,
+        emoji: signals.emoji,
+        mathml: signals.mathml,
+      }),
     };
 
     // headlessScore is a 0-1 float; cast to 0-100 integer for the INTEGER DB column
@@ -163,21 +197,24 @@ app.post('/v1/fingerprint', async (c) => {
       // ─── Tier 2: Weighted fuzzy match ───
       // Pull candidates sharing at least one strong signal
       const candidates = await db.query(
-        `SELECT visitor_id, canvas_hash, webgl_hash, audio_hash,
+        `SELECT visitor_id, ip_address, canvas_hash, webgl_hash, audio_hash,
                 screen_hash, font_hash, browser_hash, hardware_hash
          FROM fingerprints
          WHERE api_key_id = $1
-           AND (canvas_hash = $2 OR webgl_hash = $3 OR audio_hash = $4
-                OR screen_hash = $5 OR hardware_hash = $6)
-         ORDER BY last_seen DESC LIMIT 50`,
-        [apiKeyId, hashes.canvas, hashes.webgl, hashes.audio,
-         hashes.screen, hashes.hardware]
+         ORDER BY last_seen DESC
+         LIMIT 250`,
+        [apiKeyId]
       );
 
       // Signal weights — ordered by spoofing difficulty
       const weights: Record<string, number> = {
-        canvas: 0.22, webgl: 0.18, audio: 0.14,
-        screen: 0.12, hardware: 0.12, fonts: 0.10, browser: 0.06,
+        screen: 0.18,
+        fonts: 0.16,
+        hardware: 0.16,
+        webgl: 0.14,
+        browser: 0.14,
+        canvas: 0.12,
+        audio: 0.10,
       };
 
       let bestScore = 0;
@@ -190,20 +227,29 @@ app.post('/v1/fingerprint', async (c) => {
         const matched: string[] = [];
 
         const pairs = [
-          { key: 'canvas',   a: hashes.canvas,   b: cand.canvas_hash },
-          { key: 'webgl',    a: hashes.webgl,    b: cand.webgl_hash },
-          { key: 'audio',    a: hashes.audio,    b: cand.audio_hash },
-          { key: 'screen',   a: hashes.screen,   b: cand.screen_hash },
-          { key: 'hardware', a: hashes.hardware, b: cand.hardware_hash },
-          { key: 'fonts',    a: hashes.fonts,    b: cand.font_hash },
-          { key: 'browser',  a: hashes.browser,  b: cand.browser_hash },
+          { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
+          { key: 'webgl',    values: [hashes.webgl, legacyHashes.webgl],     stored: cand.webgl_hash },
+          { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
+          { key: 'screen',   values: [hashes.screen, legacyHashes.screen],    stored: cand.screen_hash },
+          { key: 'hardware', values: [hashes.hardware, legacyHashes.hardware],stored: cand.hardware_hash },
+          { key: 'fonts',    values: [hashes.fonts, legacyHashes.fonts],      stored: cand.font_hash },
+          { key: 'browser',  values: [hashes.browser, legacyHashes.browser],  stored: cand.browser_hash },
         ];
 
-        for (const { key, a, b } of pairs) {
-          if (!a || !b) continue;
+        for (const { key, values, stored } of pairs) {
+          if (!stored) continue;
+          const incoming = values.filter(Boolean);
+          if (incoming.length === 0) continue;
           total += weights[key];
-          if (a === b) { score += weights[key]; matched.push(key); }
+          if (incoming.includes(stored)) {
+            score += weights[key];
+            matched.push(key);
+          }
         }
+
+        const stableMatches = ['screen', 'fonts', 'hardware', 'webgl'].filter((key) => matched.includes(key)).length;
+        if (stableMatches >= 3) score += 0.06;
+        if (stableMatches >= 2 && normalizeIp(cand.ip_address) === normalizedClientIp) score += 0.04;
 
         const normalized = total > 0 ? score / total : 0;
         if (normalized > bestScore) {
@@ -213,7 +259,7 @@ app.post('/v1/fingerprint', async (c) => {
         }
       }
 
-      const MATCH_THRESHOLD = 0.60;
+      const MATCH_THRESHOLD = 0.58;
 
       if (bestCandidate && bestScore >= MATCH_THRESHOLD) {
         visitorId = bestCandidate.visitor_id;
