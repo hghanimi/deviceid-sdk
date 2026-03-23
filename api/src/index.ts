@@ -402,12 +402,31 @@ app.post('/v1/fingerprint', async (c) => {
     const headlessScoreInt = Math.round((evasion?.headlessScore || 0) * 100);
     const botCount = Object.values(evasion?.bot || {}).filter(Boolean).length;
     const normalizedClientIp = normalizeIp(clientIp);
+
+    const isIPv4 = (ip: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
+    const isIPv6 = (ip: string) => ip.includes(':');
+
     const webrtcIps: string[] = Array.isArray(evasion?.webrtcIPs)
       ? evasion.webrtcIPs.map((ip: string) => normalizeIp(ip)).filter(Boolean)
       : [];
     const publicWebrtcIps = webrtcIps.filter((ip) => !isPrivateIp(ip));
-    const isVpn = publicWebrtcIps.length > 0
-      && (isPrivateIp(normalizedClientIp) || publicWebrtcIps.some((ip) => ip !== normalizedClientIp));
+
+    // VPN detection: only compare IPs of the SAME protocol family.
+    // CF-Connecting-IP may be IPv6 while WebRTC STUN resolves via IPv4 — that is NOT a VPN,
+    // it's just a dual-stack network. If no same-protocol IPs exist we cannot determine mismatch.
+    // Also guard against missing/fallback client IP (0.0.0.0) which must never trigger a VPN flag.
+    let isVpn = false;
+    if (normalizedClientIp && normalizedClientIp !== '0.0.0.0' && !isPrivateIp(normalizedClientIp)) {
+      const clientIsIPv4 = isIPv4(normalizedClientIp);
+      const sameProtoWebrtcIps = publicWebrtcIps.filter((ip) =>
+        clientIsIPv4 ? isIPv4(ip) : isIPv6(ip)
+      );
+      // Flag VPN only if we have at least one same-protocol WebRTC IP and NONE of them
+      // matches the CF-observed IP (indicating all traffic is tunnelled).
+      if (sameProtoWebrtcIps.length > 0 && sameProtoWebrtcIps.every((ip) => ip !== normalizedClientIp)) {
+        isVpn = true;
+      }
+    }
 
     // ─── Tier 1: Exact composite hash match ───
     let visitorId: string;
@@ -546,19 +565,23 @@ app.post('/v1/fingerprint', async (c) => {
       [visitorId, apiKeyId]
     );
 
-    // Secondary VPN heuristic: the same visitor rotating across multiple public IPs recently.
+    // Secondary VPN heuristic: visitor rotating through 4+ distinct public IPs within 1 hour.
+    // Threshold is intentionally high (4+) and window tight (1h) to avoid false-positives from
+    // legitimate multi-device users (e.g. desktop + phone share a fuzzy-matched visitor_id but
+    // have different IPs — WiFi vs mobile data — which must NOT be flagged as VPN).
     const recentIpsResult = await db.query(
       `SELECT DISTINCT ip_address
        FROM fingerprints
-       WHERE visitor_id = $1 AND api_key_id = $2 AND ip_address IS NOT NULL
-       ORDER BY ip_address
-       LIMIT 20`,
+       WHERE visitor_id = $1 AND api_key_id = $2
+         AND ip_address IS NOT NULL
+         AND last_seen >= NOW() - INTERVAL '1 hour'
+       LIMIT 10`,
       [visitorId, apiKeyId]
     );
     const distinctRecentPublicIps = recentIpsResult.rows
       .map((row: any) => normalizeIp(row.ip_address))
       .filter((ip: string) => !!ip && !isPrivateIp(ip));
-    const vpnByIpRotation = new Set(distinctRecentPublicIps).size > 1;
+    const vpnByIpRotation = new Set(distinctRecentPublicIps).size >= 4;
     const finalIsVpn = isVpn || vpnByIpRotation;
 
     // ─── Risk scoring ───
