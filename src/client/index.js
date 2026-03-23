@@ -395,22 +395,53 @@ class DeviceID {
   _getWebRTCIPs() {
     return new Promise(function (resolve) {
       var ips = [];
+      var completed = false;
+
+      var addIp = function (ip) {
+        if (!ip || ips.indexOf(ip) !== -1) return;
+        ips.push(ip);
+      };
+
+      var extractIps = function (text) {
+        if (!text) return;
+        var ipv4 = text.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [];
+        for (var i = 0; i < ipv4.length; i++) addIp(ipv4[i]);
+
+        var ipv6 = text.match(/\b(?:[a-fA-F0-9]{1,4}:){2,7}[a-fA-F0-9]{1,4}\b/g) || [];
+        for (var j = 0; j < ipv6.length; j++) addIp(ipv6[j].toLowerCase());
+      };
+
+      var finish = function (pc) {
+        if (completed) return;
+        completed = true;
+        try { pc.close(); } catch (x) {}
+        resolve(ips);
+      };
+
       try {
         var pc = new RTCPeerConnection({
           iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
         });
         pc.createDataChannel('');
+
         pc.createOffer().then(function (offer) {
+          extractIps(offer && offer.sdp ? offer.sdp : '');
           return pc.setLocalDescription(offer);
+        }).then(function () {
+          if (pc.localDescription && pc.localDescription.sdp) {
+            extractIps(pc.localDescription.sdp);
+          }
         }).catch(function () {});
 
         pc.onicecandidate = function (e) {
-          if (!e.candidate) { pc.close(); resolve(ips); return; }
-          var m = e.candidate.candidate.match(/(\d{1,3}\.){3}\d{1,3}/);
-          if (m && ips.indexOf(m[0]) === -1) ips.push(m[0]);
+          if (!e.candidate) {
+            finish(pc);
+            return;
+          }
+          extractIps(e.candidate.candidate || '');
         };
 
-        setTimeout(function () { try { pc.close(); } catch (x) {} resolve(ips); }, 3000);
+        setTimeout(function () { finish(pc); }, 5000);
       } catch (e) {
         resolve([]);
       }
@@ -488,19 +519,77 @@ class DeviceID {
   // PRIVATE MODE DETECTION
   // ============================================================
   _detectPrivate() {
-    return new Promise(function (resolve) {
-      if (navigator.storage && navigator.storage.estimate) {
-        navigator.storage.estimate().then(function (est) {
-          resolve(est.quota && est.quota < 120000000);
-        }).catch(function () { resolve(false); });
-        return;
-      }
-      var fs = window.RequestFileSystem || window.webkitRequestFileSystem;
-      if (fs) {
-        fs(window.TEMPORARY, 1, function () { resolve(false); }, function () { resolve(true); });
-        return;
-      }
-      resolve(false);
+    return new Promise(async function (resolve) {
+      var score = 0;
+
+      // Chrome-family private windows usually report much lower storage quota.
+      try {
+        if (navigator.storage && navigator.storage.estimate) {
+          var est = await navigator.storage.estimate();
+          var quota = est && est.quota ? est.quota : 0;
+          var ua = navigator.userAgent || '';
+          var isChromeFamily = /Chrome|CriOS|Edg\//.test(ua) && !/Firefox|FxiOS/.test(ua);
+          var lowQuotaThreshold = (navigator.deviceMemory || 4) <= 2 ? 120000000 : 320000000;
+          if (isChromeFamily && quota > 0 && quota < lowQuotaThreshold) {
+            score += 2;
+          }
+        }
+      } catch (e) {}
+
+      // Older WebKit private mode tends to deny temporary filesystem access.
+      try {
+        var fs = window.RequestFileSystem || window.webkitRequestFileSystem;
+        if (fs) {
+          var fsDenied = await new Promise(function (done) {
+            fs(window.TEMPORARY, 1, function () { done(false); }, function () { done(true); });
+          });
+          if (fsDenied) {
+            score += 2;
+          }
+        }
+      } catch (e) {}
+
+      // Firefox private mode and hardened browsers often block IndexedDB access.
+      try {
+        var idbBlocked = await new Promise(function (done) {
+          if (typeof indexedDB === 'undefined') {
+            done(true);
+            return;
+          }
+
+          var completed = false;
+          var finish = function (value) {
+            if (!completed) {
+              completed = true;
+              done(value);
+            }
+          };
+
+          try {
+            var dbName = '__athar_private_test__';
+            var req = indexedDB.open(dbName, 1);
+            req.onupgradeneeded = function () {};
+            req.onerror = function () { finish(true); };
+            req.onsuccess = function (event) {
+              try {
+                var db = event.target.result;
+                db.close();
+                indexedDB.deleteDatabase(dbName);
+              } catch (x) {}
+              finish(false);
+            };
+            setTimeout(function () { finish(false); }, 1000);
+          } catch (x) {
+            finish(true);
+          }
+        });
+
+        if (idbBlocked) {
+          score += 1;
+        }
+      } catch (e) {}
+
+      resolve(score >= 2);
     });
   }
 
