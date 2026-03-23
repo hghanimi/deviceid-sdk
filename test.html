@@ -540,8 +540,17 @@ sdk.identify().then(result =&gt; {
   async function loadDashboard() {
     try {
       const res = await fetch(`${API}/v1/dashboard`, { headers: { 'x-api-key': KEY } });
+      if (!res.ok) {
+        console.error('Dashboard HTTP error:', res.status);
+        document.getElementById('lastRefresh').textContent = 'Error: HTTP ' + res.status;
+        return;
+      }
       data = await res.json();
-      if (data.error) { console.error('Dashboard API error:', data.error, data.details); return; }
+      if (data.error) {
+        console.error('Dashboard API error:', data.error, data.details);
+        document.getElementById('lastRefresh').textContent = 'Error: ' + data.error;
+        return;
+      }
       allEvents = data.allEvents || data.riskyEvents || [];
       const map = new Map();
       allEvents.forEach(e => { if (!map.has(e.visitorId)) map.set(e.visitorId, e); });
@@ -557,7 +566,10 @@ sdk.identify().then(result =&gt; {
       renderIdentities();
       document.getElementById('lastRefresh').textContent =
         'Refreshed ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error('Dashboard load failed:', e);
+      document.getElementById('lastRefresh').textContent = 'Error: ' + e.message;
+    }
   }
 
   // ── Overview ──
@@ -587,7 +599,7 @@ sdk.identify().then(result =&gt; {
     setKpi('kpi-incog', (ov.incognito_24h || 0).toLocaleString(), null);
     document.getElementById('kpi-incog-d').textContent = 'Private browsing sessions';
 
-    renderChart();
+    try { renderChart(); } catch(ce) { console.error('Chart error:', ce); }
     renderSignalCoverage();
     renderMerchants();
   }
