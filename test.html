@@ -337,11 +337,11 @@
           <th>Timestamp</th>
           <th>Visitor ID</th>
           <th>Merchant</th>
+          <th>Match Tier</th>
           <th>Risk Score</th>
           <th>IP Address</th>
           <th>Signals</th>
-          <th style="text-align:center">Links</th>
-          <th style="text-align:center">Visits</th>
+          <th style="text-align:center">New?</th>
         </tr></thead>
         <tbody id="events-tbody"><tr><td colspan="8" class="loading"><div class="spin"></div><br>Loading events…</td></tr></tbody>
       </table>
@@ -501,6 +501,7 @@ sdk.identify().then(result =&gt; {
   const KEY = 'pk_live_wayl_001';
   let data = null;
   let allEvents = [];
+  let eventLogEntries = [];
   let uniqIdentities = [];
   let trendChart = null;
 
@@ -552,6 +553,21 @@ sdk.identify().then(result =&gt; {
         return;
       }
       allEvents = data.allEvents || data.riskyEvents || [];
+      // Per-visit event log from the events table
+      eventLogEntries = (data.eventLog || []).map(e => {
+        const ed = e.eventData || {};
+        return {
+          visitorId: e.visitorId,
+          merchantName: e.merchantName || '—',
+          ipAddress: e.ipAddress,
+          matchTier: ed.matchTier || '—',
+          riskScore: ed.riskScore || 0,
+          isVpn: ed.isVpn || false,
+          isNew: ed.isNew || false,
+          signalsCollected: ed.signalsCollected || 0,
+          createdAt: e.createdAt,
+        };
+      });
       const map = new Map();
       allEvents.forEach(e => { if (!map.has(e.visitorId)) map.set(e.visitorId, e); });
       uniqIdentities = [...map.values()];
@@ -710,11 +726,11 @@ sdk.identify().then(result =&gt; {
     const s = document.getElementById('evtSearch').value.toLowerCase();
     const m = document.getElementById('evtMerchant').value;
     const r = document.getElementById('evtRisk').value;
-    let evs = allEvents;
+    let evs = eventLogEntries;
     if (s) evs = evs.filter(e => (e.visitorId||'').toLowerCase().includes(s) || (e.ipAddress||'').includes(s) || (e.merchantName||'').toLowerCase().includes(s));
     if (m) evs = evs.filter(e => e.publicKey === m);
-    if (r === 'high') evs = evs.filter(e => isHighRisk(e));
-    if (r === 'clean') evs = evs.filter(e => !isHighRisk(e));
+    if (r === 'high') evs = evs.filter(e => e.riskScore >= 40);
+    if (r === 'clean') evs = evs.filter(e => e.riskScore < 40);
     renderEventsRows(evs);
   }
   function renderEvents() { applyFilter(); }
@@ -722,20 +738,18 @@ sdk.identify().then(result =&gt; {
   function renderEventsRows(evs) {
     document.getElementById('evts-count').textContent = evs.length + ' events';
     document.getElementById('events-tbody').innerHTML = evs.map(e => {
-      const risk = calcRisk(e);
-      const lc = e.linkedCount || 0;
-      const linkBadge = lc > 0
-        ? `<span class="badge b-accent" title="${lc} linked device(s)">&#x1F517; ${lc}</span>`
-        : '<span class="badge b-muted">—</span>';
+      const risk = e.riskScore;
+      const tierColors = { exact: 'var(--ok)', fuzzy: 'var(--warn)', 'cross-device': 'var(--accent)', 'new': 'var(--brand)' };
+      const tierColor = tierColors[e.matchTier] || 'var(--muted)';
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
-        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.lastSeen)}</td>
+        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.createdAt)}</td>
         <td><span class="mono" style="color:var(--brand)">${esc((e.visitorId||'').substring(0,20))}…</span></td>
         <td>${esc(e.merchantName||'—')}</td>
+        <td><span class="badge" style="background:${tierColor};color:#fff">${esc(e.matchTier)}</span></td>
         <td>${riskPill(risk)}</td>
         <td class="mono" style="font-size:11px">${esc(e.ipAddress||'—')}</td>
-        <td><div class="sigs">${sigBadges(e)}</div></td>
-        <td style="text-align:center">${linkBadge}</td>
-        <td style="text-align:center"><span class="badge b-muted">${e.visitCount||1}</span></td>
+        <td><span class="badge b-muted">${e.signalsCollected}/${22}</span>${e.isVpn ? ' <span class=\"badge b-danger\">VPN</span>' : ''}</td>
+        <td style="text-align:center">${e.isNew ? '<span class="badge b-brand">NEW</span>' : '<span class="badge b-muted">—</span>'}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="8" class="loading">No events match</td></tr>';
   }

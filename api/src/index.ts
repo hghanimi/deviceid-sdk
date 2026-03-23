@@ -103,7 +103,7 @@ app.get('/v1/dashboard', async (c) => {
   }
 
   try {
-    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ] = await Promise.all([
+    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ, eventLogQ] = await Promise.all([
       db.query(
         `SELECT
            COUNT(*)::int AS events_24h,
@@ -217,6 +217,16 @@ app.get('/v1/dashboard', async (c) => {
          ) sub
          GROUP BY sub.visitor_id`
       ).catch(() => ({ rows: [] })),
+      // Per-visit event log from the events table
+      db.query(
+        `SELECT e.visitor_id, e.event_type, e.event_data, e.ip_address, e.created_at,
+                k.name AS merchant_name
+         FROM events e
+         JOIN api_keys k ON k.id = e.api_key_id
+         WHERE e.created_at >= NOW() - INTERVAL '24 hours'
+         ORDER BY e.created_at DESC
+         LIMIT 200`
+      ).catch(() => ({ rows: [] })),
     ]);
 
     // Build a map of visitor_id → link count
@@ -274,6 +284,14 @@ app.get('/v1/dashboard', async (c) => {
         uniqueDevices: row.unique_devices,
         trusted: row.trusted,
         highRisk: row.high_risk,
+      })),
+      eventLog: eventLogQ.rows.map((row: any) => ({
+        visitorId: row.visitor_id,
+        eventType: row.event_type,
+        eventData: row.event_data,
+        ipAddress: row.ip_address,
+        merchantName: row.merchant_name,
+        createdAt: row.created_at,
       })),
     });
   } catch (err: any) {
@@ -848,6 +866,26 @@ app.post('/v1/fingerprint', async (c) => {
     // IP change without VPN detection = suspicious
     if (ipChanged && !finalIsVpn)    riskScore += 10;
     riskScore = Math.min(100, Math.max(0, riskScore));
+
+    // ─── Log every visit to the events table (audit trail) ───
+    try {
+      await db.query(
+        `INSERT INTO events (visitor_id, event_type, event_data, ip_address, api_key_id)
+         VALUES ($1, $2, $3::jsonb, $4, $5)`,
+        [visitorId, 'identify', JSON.stringify({
+          matchTier,
+          confidence: isNew ? 1.0 : matchConfidence,
+          riskScore,
+          isVpn: finalIsVpn,
+          ipChanged,
+          isNew,
+          signalsCollected,
+          userAgent: c.req.header('User-Agent') || null,
+        }), clientIp, apiKeyId]
+      );
+    } catch (e) {
+      console.error('Event log error:', e);
+    }
 
     return c.json({
       visitorId,
