@@ -6,11 +6,3 @@ compatibility_date = "2024-12-01"
 [[hyperdrive]]
 binding = "DB"
 id = "your-hyperdrive-id"
-
-# Production environment
-[env.production]
-vars = { ENVIRONMENT = "production" }
-
-# Development environment  
-[env.development]
-vars = { ENVIRONMENT = "development" }
