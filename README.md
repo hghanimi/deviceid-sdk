@@ -1,5 +1,79 @@
 # DeviceID SDK
 
+A browser fingerprinting SDK that identifies devices across sessions, incognito mode, and browser switches.
+
+## Live Endpoints
+
+| | URL |
+|---|---|
+| **SDK (CDN)** | `https://deviceid-cdn.pages.dev/deviceid.min.js` |
+| **Demo page** | `https://deviceid-cdn.pages.dev` |
+| **API** | `https://api.arch-hayder.workers.dev` |
+
+## Quick Integration
+
+```html
+<script src="https://deviceid-cdn.pages.dev/deviceid.min.js"></script>
+<script>
+  const did = new DeviceID({ apiKey: 'YOUR_API_KEY' });
+  const result = await did.identify();
+  console.log(result.visitorId); // e.g. "dvc_xxxxxxxxxx"
+</script>
+```
+
+## API Response
+
+```json
+{
+  "visitorId": "dvc_xxxxxxxxxx",
+  "isNew": false,
+  "confidence": 1.0,
+  "riskScore": 20,
+  "linkedDevices": [],
+  "processingTimeMs": 1200
+}
+```
+
+## Project Structure
+
+```
+├── src/client/index.js      # Browser SDK source
+├── build.js                 # esbuild config (run: npm run build)
+├── dist/
+│   ├── deviceid.min.js      # Built SDK (auto-deployed to CDN)
+│   └── _redirects           # Cloudflare Pages routing
+├── test.html                # Demo/test page
+├── api/
+│   ├── src/index.ts         # Cloudflare Worker API
+│   └── wrangler.jsonc       # Worker config
+└── package.json
+```
+
+## Development
+
+```bash
+# Build SDK
+npm run build
+
+# Deploy SDK to CDN
+npx wrangler pages deploy dist --project-name deviceid-cdn --branch main
+
+# Deploy Worker API
+cd api && npx wrangler deploy src/index.ts --config wrangler.jsonc
+```
+
+## Stats
+
+```bash
+curl https://api.arch-hayder.workers.dev/stats -H "x-api-key: YOUR_API_KEY"
+```
+
+## Stack
+
+- **SDK**: Vanilla JS, esbuild, IIFE bundle
+- **API**: Cloudflare Workers + Hono + PostgreSQL (pg)
+- **Database**: Supabase PostgreSQL
+- **CDN**: Cloudflare Pages
 > Browser-based device fingerprinting for fraud detection and device identification
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
