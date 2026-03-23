@@ -1,174 +1,371 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeviceID SDK Test</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Athar Device Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet" />
     <style>
+        :root {
+            --bg: #081018;
+            --panel: #121f2f;
+            --panel-strong: #0f1a27;
+            --accent: #13b67f;
+            --accent-2: #f4a13d;
+            --text: #ecf2f9;
+            --muted: #9cb0c3;
+            --danger: #ff6a6a;
+            --ok: #4be38f;
+            --radius: 18px;
+            --shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+        }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 900px;
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Space Grotesk", "IBM Plex Sans Arabic", sans-serif;
+            background:
+                radial-gradient(1200px 600px at 90% -10%, rgba(19, 182, 127, 0.12), transparent 55%),
+                radial-gradient(900px 500px at -10% 120%, rgba(244, 161, 61, 0.16), transparent 52%),
+                linear-gradient(160deg, #04080d 0%, #0a141f 44%, #111d2d 100%);
+            padding: 24px;
+        }
+
+        .shell {
+            max-width: 1080px;
             margin: 0 auto;
+            display: grid;
+            gap: 18px;
+            animation: rise 500ms ease;
+        }
+
+        .hero {
+            background: linear-gradient(130deg, rgba(18, 31, 47, 0.92), rgba(9, 18, 28, 0.95));
+            border: 1px solid rgba(156, 176, 195, 0.2);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .title {
+            margin: 0;
+            font-size: clamp(28px, 4vw, 46px);
+            line-height: 1;
+            letter-spacing: 0.5px;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
+            max-width: 620px;
+            font-size: 15px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(19, 182, 127, 0.15);
+            border: 1px solid rgba(19, 182, 127, 0.45);
+            color: #b5f4dc;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 18px;
+        }
+
+        .card {
+            background: linear-gradient(170deg, rgba(18, 31, 47, 0.88), rgba(12, 24, 36, 0.92));
+            border: 1px solid rgba(156, 176, 195, 0.2);
+            border-radius: var(--radius);
             padding: 20px;
-            background: #f5f5f5;
+            box-shadow: var(--shadow);
         }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            margin-top: 0;
-        }
-        .button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 10px 0;
-        }
-        .button:hover {
-            background: #0056b3;
-        }
-        .button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        .status {
-            margin-top: 20px;
-            padding: 15px;
-            border-left: 4px solid #007bff;
-            background: #f0f7ff;
-            border-radius: 4px;
-        }
-        .status.loading {
-            border-left-color: #ffc107;
-            background: #fff8f0;
-        }
-        .status.success {
-            border-left-color: #28a745;
-            background: #f0fff4;
-        }
-        .status.error {
-            border-left-color: #dc3545;
-            background: #fff5f5;
-        }
-        pre {
-            background: #f8f8f8;
-            padding: 15px;
-            border-radius: 4px;
-            overflow-x: auto;
+
+        .controls { display: grid; gap: 12px; }
+
+        label {
+            display: grid;
+            gap: 6px;
             font-size: 13px;
-            line-height: 1.4;
+            color: var(--muted);
         }
-        .response {
-            margin-top: 20px;
+
+        input {
+            width: 100%;
+            border: 1px solid rgba(156, 176, 195, 0.32);
+            border-radius: 12px;
+            background: rgba(8, 16, 24, 0.78);
+            color: var(--text);
+            padding: 12px;
+            font: inherit;
         }
-        .info {
-            background: #f0f7ff;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            border-left: 4px solid #007bff;
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 4px;
         }
-        .error-text {
-            color: #dc3545;
-            font-weight: bold;
+
+        button {
+            border: 0;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 120ms ease, opacity 120ms ease;
         }
-        .success-text {
-            color: #28a745;
-            font-weight: bold;
+
+        button:active { transform: translateY(1px); }
+
+        .btn-primary {
+            background: linear-gradient(130deg, var(--accent), #0ea16f);
+            color: #022117;
+            min-width: 180px;
+        }
+
+        .btn-ghost {
+            background: rgba(156, 176, 195, 0.1);
+            color: var(--text);
+            border: 1px solid rgba(156, 176, 195, 0.24);
+        }
+
+        .status {
+            margin-top: 10px;
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid transparent;
+            color: var(--muted);
+            background: rgba(8, 16, 24, 0.6);
+            min-height: 48px;
+        }
+
+        .status.loading { border-color: rgba(244, 161, 61, 0.45); color: #ffd8a4; }
+        .status.success { border-color: rgba(75, 227, 143, 0.45); color: #b8f8d0; }
+        .status.error { border-color: rgba(255, 106, 106, 0.55); color: #ffc2c2; }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .metric {
+            background: rgba(8, 16, 24, 0.72);
+            border: 1px solid rgba(156, 176, 195, 0.18);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .metric .k {
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+        }
+
+        .metric .v {
+            margin-top: 6px;
+            font-size: 18px;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .chip {
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            border: 1px solid rgba(156, 176, 195, 0.25);
+            background: rgba(8, 16, 24, 0.6);
+            color: #dbe8f4;
+        }
+
+        .chip.ok {
+            border-color: rgba(75, 227, 143, 0.4);
+            color: #b7f7d0;
+        }
+
+        .chip.bad {
+            border-color: rgba(255, 106, 106, 0.45);
+            color: #ffc1c1;
+        }
+
+        pre {
+            margin: 0;
+            max-height: 380px;
+            overflow: auto;
+            border-radius: 12px;
+            border: 1px solid rgba(156, 176, 195, 0.2);
+            background: rgba(5, 11, 18, 0.86);
+            padding: 14px;
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #c9d8e7;
+        }
+
+        .raw-title {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: var(--muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+            body { padding: 14px; }
+            .hero, .card { padding: 16px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔍 DeviceID SDK Test</h1>
-        
-        <div class="info">
-            <strong>API Endpoint:</strong> https://api.arch-hayder.workers.dev<br>
-            <strong>SDK Version:</strong> 1.0.0<br>
-            <strong>API Key:</strong> pk_live_wayl_001 (test key)
-        </div>
+    <main class="shell">
+        <section class="hero">
+            <div>
+                <div class="badge">Athar Device Intelligence</div>
+                <h1 class="title">Live Fingerprint UI</h1>
+                <p class="subtitle">A clean product-style console for testing visitor identity, risk scoring, VPN/incognito signals, and match behavior in real time.</p>
+            </div>
+            <div class="badge">SDK v3 + Worker v3 scoring</div>
+        </section>
 
-        <button class="button" onclick="testIdentify()" id="testBtn">
-            Run Device Identification Test
-        </button>
+        <section class="grid">
+            <article class="card controls">
+                <label>
+                    API Key
+                    <input id="apiKey" value="pk_live_wayl_001" autocomplete="off" />
+                </label>
+                <label>
+                    API Endpoint
+                    <input id="apiEndpoint" value="https://api.arch-hayder.workers.dev/v1/fingerprint" autocomplete="off" />
+                </label>
 
-        <div id="status"></div>
-        <div id="response" class="response"></div>
-    </div>
+                <div class="actions">
+                    <button class="btn-primary" id="runBtn">Run Identification</button>
+                    <button class="btn-ghost" id="clearBtn">Clear Output</button>
+                </div>
 
-    <!-- Load SDK from CDN -->
+                <div id="status" class="status">Ready to test the live pipeline.</div>
+
+                <div class="metrics">
+                    <div class="metric"><div class="k">Visitor ID</div><div id="mVisitor" class="v">-</div></div>
+                    <div class="metric"><div class="k">Match Tier</div><div id="mTier" class="v">-</div></div>
+                    <div class="metric"><div class="k">Risk Score</div><div id="mRisk" class="v">-</div></div>
+                    <div class="metric"><div class="k">SDK Version</div><div id="mVersion" class="v">-</div></div>
+                </div>
+
+                <div id="riskChips" class="chips"></div>
+            </article>
+
+            <article class="card">
+                <h3 class="raw-title">Raw Response</h3>
+                <pre id="raw">No response yet.</pre>
+            </article>
+        </section>
+    </main>
+
     <script src="https://deviceid-cdn.pages.dev/deviceid.min.js"></script>
-    
     <script>
-        async function testIdentify() {
-            const testBtn = document.getElementById('testBtn');
-            const statusDiv = document.getElementById('status');
-            const responseDiv = document.getElementById('response');
-            
-            testBtn.disabled = true;
-            
-            statusDiv.className = 'status loading';
-            statusDiv.innerHTML = '⏳ Collecting browser signals and identifying device...';
-            responseDiv.innerHTML = '';
-            
+        const el = (id) => document.getElementById(id);
+
+        function setStatus(type, msg) {
+            const node = el('status');
+            node.className = 'status' + (type ? ' ' + type : '');
+            node.textContent = msg;
+        }
+
+        function chip(label, active) {
+            const span = document.createElement('span');
+            span.className = 'chip ' + (active ? 'bad' : 'ok');
+            span.textContent = label + ': ' + (active ? 'true' : 'false');
+            return span;
+        }
+
+        function renderResult(result) {
+            el('mVisitor').textContent = result.visitorId || '-';
+            el('mTier').textContent = result.matchTier || '-';
+            el('mRisk').textContent = result.riskScore != null ? String(result.riskScore) : '-';
+            el('mVersion').textContent = result.sdkVersion || '-';
+            el('raw').textContent = JSON.stringify(result, null, 2);
+
+            const chips = el('riskChips');
+            chips.innerHTML = '';
+            const signals = result.riskSignals || {};
+            chips.appendChild(chip('vpn', !!signals.vpn));
+            chips.appendChild(chip('incognito', !!signals.incognito));
+            chips.appendChild(chip('headless', !!signals.headless));
+            chips.appendChild(chip('bot', !!signals.bot));
+            chips.appendChild(chip('tampered', !!signals.tampered));
+            chips.appendChild(chip('multiAccount', !!signals.multiAccount));
+        }
+
+        async function runIdentify() {
+            const runBtn = el('runBtn');
+            runBtn.disabled = true;
+            setStatus('loading', 'Collecting signals and calling the live API...');
+
             try {
-                // Initialize SDK with test API key
                 const did = new DeviceID({
-                    apiKey: 'pk_live_wayl_001',
-                    debug: true
+                    apiKey: el('apiKey').value.trim(),
+                    apiEndpoint: el('apiEndpoint').value.trim(),
+                    debug: false,
                 });
-                
-                // Identify device
+
                 const result = await did.identify();
-                
-                // Show success
-                statusDiv.className = 'status success';
-                statusDiv.innerHTML = '<span class="success-text">✅ Device identified successfully!</span>';
-                
-                // Display response
-                responseDiv.innerHTML = '<h3>Response Data:</h3><pre>' + 
-                    JSON.stringify(result, null, 2) + 
-                    '</pre>';
-                
-                // Check for risk signals
-                if (result.riskScore > 50) {
-                    responseDiv.innerHTML += '<p style="color: #ff9800;"><strong>⚠️ Warning:</strong> Risk score is elevated (' + result.riskScore + '/100)</p>';
-                }
-                
-                // Check if new device
-                if (result.isNew) {
-                    responseDiv.innerHTML += '<p style="color: #007bff;"><strong>ℹ️ Info:</strong> This is a new device or first visit</p>';
-                } else {
-                    responseDiv.innerHTML += '<p style="color: #28a745;"><strong>✓ Info:</strong> Device has been seen before</p>';
-                }
-                
-                // Device links if any
-                if (result.linkedDevices && result.linkedDevices.length > 0) {
-                    responseDiv.innerHTML += '<p><strong>🔗 Linked Devices:</strong> ' + result.linkedDevices.length + ' device(s) linked to this identity</p>';
-                }
-                
+                renderResult(result);
+                setStatus('success', 'Identification completed successfully.');
             } catch (err) {
-                statusDiv.className = 'status error';
-                statusDiv.innerHTML = '<span class="error-text">❌ Error: ' + err.message + '</span>';
-                responseDiv.innerHTML = '<h3>Error Details:</h3><pre>' + err.stack + '</pre>';
-                console.error('Test failed:', err);
+                setStatus('error', 'Request failed: ' + (err && err.message ? err.message : 'Unknown error'));
+                el('raw').textContent = err && err.stack ? err.stack : String(err);
             } finally {
-                testBtn.disabled = false;
+                runBtn.disabled = false;
             }
         }
-        
-        // Auto-test on page load (optional)
-        // window.addEventListener('load', () => {
-        //     setTimeout(() => testIdentify(), 500);
-        // });
+
+        el('runBtn').addEventListener('click', runIdentify);
+        el('clearBtn').addEventListener('click', () => {
+            setStatus('', 'Ready to test the live pipeline.');
+            el('mVisitor').textContent = '-';
+            el('mTier').textContent = '-';
+            el('mRisk').textContent = '-';
+            el('mVersion').textContent = '-';
+            el('riskChips').innerHTML = '';
+            el('raw').textContent = 'No response yet.';
+        });
     </script>
 </body>
 </html>
