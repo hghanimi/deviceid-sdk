@@ -191,11 +191,12 @@ app.post('/v1/fingerprint', authenticate, rateLimit, async (c) => {
       isNew: matchResult.isNew,
       confidence: matchResult.confidence || 1.0,
       riskScore,
-      linkedDevices: linkedDevices.map(d => ({
-        visitorId: d.visitor_id,
+      linkedDevices: (linkedDevices || []).map(d => ({
+        visitorIdA: d.visitor_id_a,
+        visitorIdB: d.visitor_id_b,
         linkType: d.link_type,
         confidence: d.confidence,
-        linkedAt: d.linked_at,
+        linkedAt: d.created_at,
       })),
       processingTimeMs: processingTime,
     }, 200);
@@ -215,7 +216,10 @@ function calculateRiskScore(factors) {
   if (factors.botScore > 0) score += 40;
   if (factors.deviceCount > 3) score += 15;
   
-  return Math.min(100, score);
+  // Reduce score if we have high match confidence
+  if (factors.matchConfidence > 0.85) score -= 10;
+  
+  return Math.min(100, Math.max(0, score));
 }
 
 // Health check for readiness
