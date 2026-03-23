@@ -412,23 +412,42 @@ app.post('/v1/fingerprint', async (c) => {
     const publicWebrtcIps = webrtcIps.filter((ip) => !isPrivateIp(ip));
 
     // ─── VPN DETECTION (multi-signal) ───
-    // Signal 1: Timezone mismatch between browser and IP geolocation.
-    //   Cloudflare's request.cf gives us the IANA timezone of the connecting IP.
-    //   The SDK sends the browser's real timezone. If they disagree, traffic is tunnelled.
-    //   This catches ALL VPNs — even those that perfectly tunnel WebRTC.
     const cfData = (c.req.raw as any).cf || {};
-    const ipTimezone: string = (cfData.timezone || '').toLowerCase();
-    const browserTimezone: string = (signals.timezone?.tz || '').toLowerCase();
-    const ipCountry: string = (cfData.country || '').toUpperCase();
+    const ipTimezone: string = (cfData.timezone || '');
+    const browserTimezone: string = (signals.timezone?.tz || '');
+    const browserOffset: number = typeof signals.timezone?.offset === 'number' ? signals.timezone.offset : NaN;
+
+    // Compute UTC offset (in minutes, east-positive) from an IANA timezone name.
+    // Workers have full V8 Intl support.
+    const getIanaOffset = (iana: string): number | null => {
+      try {
+        if (!iana) return null;
+        const now = new Date();
+        const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC' });
+        const tzStr  = now.toLocaleString('en-US', { timeZone: iana });
+        return (new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 60000;
+      } catch { return null; }
+    };
 
     let vpnScore = 0;
 
-    // (a) Timezone mismatch — strongest signal
-    if (ipTimezone && browserTimezone && ipTimezone !== browserTimezone) {
-      vpnScore += 3;
+    // (a) Timezone offset mismatch — strongest signal.
+    //   Instead of comparing IANA names (which breaks for mobile carriers routing through
+    //   nearby-country gateways, e.g. "Asia/Kuwait" vs "Asia/Baghdad" → same region, ±1h),
+    //   compare the actual UTC offset. Only flag if the difference exceeds 2 hours (120 min),
+    //   which catches VPNs to distant locations while ignoring regional carrier routing.
+    const ipOffsetMin = getIanaOffset(ipTimezone);   // +180 for UTC+3 (Baghdad)
+    // Browser's getTimezoneOffset() returns UTC−local, so negate to get east-positive:
+    const browserOffsetMin = !isNaN(browserOffset) ? -browserOffset : null;
+
+    if (ipOffsetMin !== null && browserOffsetMin !== null) {
+      const diffMinutes = Math.abs(ipOffsetMin - browserOffsetMin);
+      if (diffMinutes > 120) {
+        vpnScore += 3;   // far-away VPN (US, Asia, etc.)
+      }
     }
 
-    // (b) Known VPN / datacenter ASN keywords
+    // (b) Known VPN / datacenter ASN keywords — catches nearby VPNs that pass timezone check
     const asOrg: string = (cfData.asOrganization || '').toLowerCase();
     const vpnAsKeywords = [
       'nordvpn', 'expressvpn', 'surfshark', 'cyberghost', 'mullvad', 'protonvpn',
@@ -436,7 +455,7 @@ app.post('/v1/fingerprint', async (c) => {
       'torguard', 'hide.me', 'tunnelbear',
       // Common datacenter providers (IPs never used by real ISPs)
       'ovh', 'hetzner', 'digitalocean', 'digital ocean', 'vultr', 'linode',
-      'choopa', 'M247', 'm247', 'datacamp', 'psychz',
+      'choopa', 'm247', 'datacamp', 'psychz',
     ];
     if (asOrg && vpnAsKeywords.some((kw) => asOrg.includes(kw))) {
       vpnScore += 3;
@@ -453,7 +472,7 @@ app.post('/v1/fingerprint', async (c) => {
       }
     }
 
-    // Threshold: score ≥ 2 = VPN. Any single strong signal (timezone mismatch OR datacenter ASN) is enough.
+    // Threshold: score ≥ 2 = VPN.
     let isVpn = vpnScore >= 2;
 
     // ─── Tier 1: Exact composite hash match ───
