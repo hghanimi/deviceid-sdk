@@ -103,7 +103,7 @@ app.get('/v1/dashboard', async (c) => {
   }
 
   try {
-    const [overview, merchants, riskyEvents, hourly, allEventsQ] = await Promise.all([
+    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ] = await Promise.all([
       db.query(
         `SELECT
            COUNT(*)::int AS events_24h,
@@ -207,7 +207,23 @@ app.get('/v1/dashboard', async (c) => {
          ORDER BY f.last_seen DESC
          LIMIT 200`
       ),
+      // Count linked devices per visitor (for identity linking display)
+      db.query(
+        `SELECT sub.visitor_id, COUNT(*)::int AS link_count
+         FROM (
+           SELECT visitor_id_a AS visitor_id FROM device_links
+           UNION ALL
+           SELECT visitor_id_b AS visitor_id FROM device_links
+         ) sub
+         GROUP BY sub.visitor_id`
+      ),
     ]);
+
+    // Build a map of visitor_id → link count
+    const linkMap = new Map<string, number>();
+    for (const row of linkedCountQ.rows) {
+      linkMap.set(row.visitor_id, row.link_count);
+    }
 
     return c.json({
       window: '24h',
@@ -217,6 +233,7 @@ app.get('/v1/dashboard', async (c) => {
           events_24h: 0, unique_devices_24h: 0, new_devices_24h: 0,
           vpn_24h: 0, incognito_24h: 0, high_risk_24h: 0, avg_confidence_pct: 0,
         }),
+        linked_identities: linkMap.size,
       },
       merchants: merchants.rows.map((row: any) => ({
         name: row.name,
@@ -249,6 +266,7 @@ app.get('/v1/dashboard', async (c) => {
         visitCount: row.visit_count,
         firstSeen: row.first_seen,
         lastSeen: row.last_seen,
+        linkedCount: linkMap.get(row.visitor_id) || 0,
       })),
       hourly: hourly.rows.map((row: any) => ({
         hour: row.hour_bucket,
@@ -479,153 +497,303 @@ app.post('/v1/fingerprint', async (c) => {
     // Threshold: score ≥ 2 = VPN.
     let isVpn = vpnScore >= 2;
 
-    // ─── Tier 1: Exact composite hash match ───
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // IDENTITY RESOLUTION — 5-tier matching pipeline
+    // The goal: know it's the same PERSON even across
+    // different browsers, devices, VPNs, IP changes.
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let visitorId: string;
     let isNew = true;
     let matchConfidence = 1.0;
     let matchTier = 'new';
     let matchedSignals: string[] = [];
+    let ipChanged = false;           // did the IP change from last visit?
+    let previousIp: string | null = null;
 
-    const exactMatch = await db.query(
-      'SELECT visitor_id FROM fingerprints WHERE raw_hash = $1 AND api_key_id = $2 LIMIT 1',
-      [hashes.composite, apiKeyId]
-    );
-
-    if (exactMatch.rows.length > 0) {
-      visitorId = exactMatch.rows[0].visitor_id;
-      isNew = false;
-      matchConfidence = 1.0;
-      matchTier = 'exact';
+    // Helper: insert a new fingerprint row for a known visitor (alias/new device print)
+    const insertAlias = async (vid: string) => {
       await db.query(
-        `UPDATE fingerprints SET last_seen = NOW(), visit_count = visit_count + 1, ip_address = $1
-         WHERE visitor_id = $2 AND api_key_id = $3`,
-        [clientIp, visitorId, apiKeyId]
+        `INSERT INTO fingerprints
+          (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
+           screen_hash, font_hash, browser_hash, hardware_hash,
+           ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        [vid, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
+         hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
+         clientIp, isVpn, evasion?.isPrivate || false, headlessScoreInt, botCount,
+         apiKeyId]
       );
-    } else {
-      // ─── Tier 2: Weighted fuzzy match ───
-      // Pull candidates sharing at least one strong signal
-      const candidates = await db.query(
-        `SELECT visitor_id, ip_address, canvas_hash, webgl_hash, audio_hash,
-                screen_hash, font_hash, browser_hash, hardware_hash
-         FROM fingerprints
-         WHERE api_key_id = $1
-         ORDER BY last_seen DESC
-         LIMIT 250`,
-        [apiKeyId]
+    };
+
+    // Helper: create a device_link between two visitors (idempotent)
+    const linkDevices = async (vidA: string, vidB: string, linkType: string, conf: number) => {
+      if (vidA === vidB) return;
+      const [a, b] = [vidA, vidB].sort(); // canonical order
+      await db.query(
+        `INSERT INTO device_links (visitor_id_a, visitor_id_b, link_type, confidence, api_key_id)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT DO NOTHING`,
+        [a, b, linkType, conf, apiKeyId]
       );
+    };
 
-      // Signal weights — rebalanced for v3 signal groups.
-      // browser group (intlProbe + cssSupports + codecs + voices) gets highest weight:
-      // intlProbe alone tests 6 number locales, 3 date locales, Hijri calendar,
-      // Arabic plurals, collation, and supported-locales — the MENA differentiator.
-      // Volatile signals (storageQuota, permissions, timezone) excluded from matching.
-      const weights: Record<string, number> = {
-        browser:  0.20,   // intlProbe + cssSupports + codecs + voices — highest entropy
-        webgl:    0.16,   // GPU pixel render + params — very stable, hard to spoof
-        fonts:    0.16,   // fonts + arabicFonts + emoji — glyph environment
-        canvas:   0.14,   // browser rendering — high entropy
-        screen:   0.12,   // screen + clientRects — display geometry
-        hardware: 0.12,   // hardware + mathml + browser basics
-        audio:    0.10,   // audio fingerprint
-      };
+    // ─── Tier 0: StoredId recovery ───────────────────
+    // The SDK persists visitor_id in localStorage, sessionStorage, cookies, and IndexedDB.
+    // If a stored ID references a known visitor, that's the STRONGEST proof of identity —
+    // it means the same browser sent us the ID we assigned previously.
+    // This catches: VPN on/off, browser updates, cleared canvas data, etc.
+    const clientStoredIds = storedIds || {};
+    const knownVids = [clientStoredIds.ls, clientStoredIds.ss, clientStoredIds.ck, clientStoredIds.legacy]
+      .filter((id: any): id is string => typeof id === 'string' && id.startsWith('dvc_'));
 
-      let bestScore = 0;
-      let bestCandidate: any = null;
-      let bestMatched: string[] = [];
-
-      for (const cand of candidates.rows) {
-        let score = 0;
-        let total = 0;
-        const matched: string[] = [];
-
-        const pairs = [
-          { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
-          { key: 'webgl',    values: [hashes.webgl, legacyHashes.webgl],     stored: cand.webgl_hash },
-          { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
-          { key: 'screen',   values: [hashes.screen, legacyHashes.screen],    stored: cand.screen_hash },
-          { key: 'hardware', values: [hashes.hardware, legacyHashes.hardware],stored: cand.hardware_hash },
-          { key: 'fonts',    values: [hashes.fonts, legacyHashes.fonts],      stored: cand.font_hash },
-          { key: 'browser',  values: [hashes.browser, legacyHashes.browser],  stored: cand.browser_hash },
-        ];
-
-        for (const { key, values, stored } of pairs) {
-          if (!stored) continue;
-          const incoming = values.filter(Boolean);
-          if (incoming.length === 0) continue;
-          total += weights[key];
-          if (incoming.includes(stored)) {
-            score += weights[key];
-            matched.push(key);
-          }
-        }
-
-        // Bonus: high-entropy signals (canvas, webgl, fonts, browser) are hardest to spoof.
-        // Matching 3+ is strong evidence of same device even if other signals changed.
-        const highEntropyMatches = ['canvas', 'webgl', 'fonts', 'browser'].filter((k) => matched.includes(k)).length;
-        if (highEntropyMatches >= 3) score += 0.08;
-        if (highEntropyMatches >= 2 && normalizeIp(cand.ip_address) === normalizedClientIp) score += 0.04;
-
-        const normalized = total > 0 ? score / total : 0;
-        if (normalized > bestScore) {
-          bestScore = normalized;
-          bestCandidate = cand;
-          bestMatched = matched;
-        }
-      }
-
-      const MATCH_THRESHOLD = 0.58;
-
-      if (bestCandidate && bestScore >= MATCH_THRESHOLD) {
-        visitorId = bestCandidate.visitor_id;
-        isNew = false;
-        matchConfidence = Math.round(bestScore * 100) / 100;
-        matchTier = 'fuzzy';
-        matchedSignals = bestMatched;
-
-        // Store alias so next visit from this browser is exact
-        await db.query(
-          `INSERT INTO fingerprints
-            (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
-             screen_hash, font_hash, browser_hash, hardware_hash,
-             ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-          [visitorId, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
-           hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
-           clientIp, isVpn, evasion?.isPrivate || false, headlessScoreInt, botCount,
-           apiKeyId]
-        );
-      } else {
-        // ─── Tier 3: New device ───
-        visitorId = `dvc_${nanoid(16)}`;
-        matchConfidence = 1.0;
-        matchTier = 'new';
-
-        await db.query(
-          `INSERT INTO fingerprints
-            (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
-             screen_hash, font_hash, browser_hash, hardware_hash,
-             ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-          [visitorId, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
-           hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
-           clientIp, isVpn, evasion?.isPrivate || false, headlessScoreInt, botCount,
-           apiKeyId]
-        );
+    let storedIdMatch: string | null = null;
+    if (knownVids.length > 0) {
+      const storedResult = await db.query(
+        `SELECT visitor_id, ip_address FROM fingerprints
+         WHERE visitor_id = ANY($1::text[]) AND api_key_id = $2
+         ORDER BY last_seen DESC LIMIT 1`,
+        [knownVids, apiKeyId]
+      );
+      if (storedResult.rows.length > 0) {
+        storedIdMatch = storedResult.rows[0].visitor_id;
+        previousIp = normalizeIp(storedResult.rows[0].ip_address);
       }
     }
 
-    // ─── Linked devices ───
+    if (storedIdMatch) {
+      // Same person — possibly different fingerprint (VPN, browser update, etc.)
+      visitorId = storedIdMatch;
+      isNew = false;
+      matchConfidence = 0.99;
+      matchTier = 'stored_id';
+
+      // Check if IP changed — strong indicator of VPN/proxy/network switch
+      if (previousIp && previousIp !== normalizedClientIp) {
+        ipChanged = true;
+      }
+
+      // Check if this exact composite hash already exists
+      const aliasExists = await db.query(
+        'SELECT 1 FROM fingerprints WHERE raw_hash = $1 AND visitor_id = $2 AND api_key_id = $3 LIMIT 1',
+        [hashes.composite, visitorId, apiKeyId]
+      );
+      if (aliasExists.rows.length > 0) {
+        // Same fingerprint — just update
+        await db.query(
+          `UPDATE fingerprints SET last_seen = NOW(), visit_count = visit_count + 1, ip_address = $1
+           WHERE visitor_id = $2 AND api_key_id = $3 AND raw_hash = $4`,
+          [clientIp, visitorId, apiKeyId, hashes.composite]
+        );
+      } else {
+        // New fingerprint for known person — store alias
+        await insertAlias(visitorId);
+      }
+
+    // ─── Tier 1: Exact composite hash match ─────────
+    } else {
+      const exactMatch = await db.query(
+        'SELECT visitor_id, ip_address FROM fingerprints WHERE raw_hash = $1 AND api_key_id = $2 LIMIT 1',
+        [hashes.composite, apiKeyId]
+      );
+
+      if (exactMatch.rows.length > 0) {
+        visitorId = exactMatch.rows[0].visitor_id;
+        isNew = false;
+        matchConfidence = 1.0;
+        matchTier = 'exact';
+        previousIp = normalizeIp(exactMatch.rows[0].ip_address);
+        if (previousIp && previousIp !== normalizedClientIp) ipChanged = true;
+
+        await db.query(
+          `UPDATE fingerprints SET last_seen = NOW(), visit_count = visit_count + 1, ip_address = $1
+           WHERE visitor_id = $2 AND api_key_id = $3`,
+          [clientIp, visitorId, apiKeyId]
+        );
+
+      } else {
+        // ─── Tier 2: Weighted fuzzy match ─────────────
+        const candidates = await db.query(
+          `SELECT visitor_id, ip_address, canvas_hash, webgl_hash, audio_hash,
+                  screen_hash, font_hash, browser_hash, hardware_hash
+           FROM fingerprints
+           WHERE api_key_id = $1
+           ORDER BY last_seen DESC
+           LIMIT 250`,
+          [apiKeyId]
+        );
+
+        const weights: Record<string, number> = {
+          browser:  0.20,
+          webgl:    0.16,
+          fonts:    0.16,
+          canvas:   0.14,
+          screen:   0.12,
+          hardware: 0.12,
+          audio:    0.10,
+        };
+
+        let bestScore = 0;
+        let bestCandidate: any = null;
+        let bestMatched: string[] = [];
+
+        for (const cand of candidates.rows) {
+          let score = 0;
+          let total = 0;
+          const matched: string[] = [];
+
+          const pairs = [
+            { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
+            { key: 'webgl',    values: [hashes.webgl, legacyHashes.webgl],     stored: cand.webgl_hash },
+            { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
+            { key: 'screen',   values: [hashes.screen, legacyHashes.screen],   stored: cand.screen_hash },
+            { key: 'hardware', values: [hashes.hardware, legacyHashes.hardware],stored: cand.hardware_hash },
+            { key: 'fonts',    values: [hashes.fonts, legacyHashes.fonts],     stored: cand.font_hash },
+            { key: 'browser',  values: [hashes.browser, legacyHashes.browser], stored: cand.browser_hash },
+          ];
+
+          for (const { key, values, stored } of pairs) {
+            if (!stored) continue;
+            const incoming = values.filter(Boolean);
+            if (incoming.length === 0) continue;
+            total += weights[key];
+            if (incoming.includes(stored)) {
+              score += weights[key];
+              matched.push(key);
+            }
+          }
+
+          const highEntropyMatches = ['canvas', 'webgl', 'fonts', 'browser'].filter((k) => matched.includes(k)).length;
+          if (highEntropyMatches >= 3) score += 0.08;
+          if (highEntropyMatches >= 2 && normalizeIp(cand.ip_address) === normalizedClientIp) score += 0.04;
+
+          const normalized = total > 0 ? score / total : 0;
+          if (normalized > bestScore) {
+            bestScore = normalized;
+            bestCandidate = cand;
+            bestMatched = matched;
+          }
+        }
+
+        const MATCH_THRESHOLD = 0.58;
+
+        if (bestCandidate && bestScore >= MATCH_THRESHOLD) {
+          visitorId = bestCandidate.visitor_id;
+          isNew = false;
+          matchConfidence = Math.round(bestScore * 100) / 100;
+          matchTier = 'fuzzy';
+          matchedSignals = bestMatched;
+          previousIp = normalizeIp(bestCandidate.ip_address);
+          if (previousIp && previousIp !== normalizedClientIp) ipChanged = true;
+          await insertAlias(visitorId);
+
+        // ─── Tier 3: Cross-device network linking ─────
+        // Same IP + at least 2 matching signal groups = likely same household/person.
+        // Creates a NEW visitor_id but LINKS it to the existing one.
+        // This catches: dad's phone, son's phone, same WiFi.
+        } else {
+          // Also check partial fuzzy matches (below threshold) for cross-device links
+          const LINK_THRESHOLD = 0.30;
+          let linkCandidate: any = null;
+          let linkScore = 0;
+          let linkMatched: string[] = [];
+
+          // Re-evaluate best candidate at lower threshold, prioritizing same-IP peers
+          for (const cand of candidates.rows) {
+            const sameIp = normalizeIp(cand.ip_address) === normalizedClientIp;
+            let score = 0;
+            let total = 0;
+            const matched: string[] = [];
+
+            const pairs = [
+              { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
+              { key: 'webgl',    values: [hashes.webgl, legacyHashes.webgl],     stored: cand.webgl_hash },
+              { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
+              { key: 'screen',   values: [hashes.screen, legacyHashes.screen],   stored: cand.screen_hash },
+              { key: 'hardware', values: [hashes.hardware, legacyHashes.hardware],stored: cand.hardware_hash },
+              { key: 'fonts',    values: [hashes.fonts, legacyHashes.fonts],     stored: cand.font_hash },
+              { key: 'browser',  values: [hashes.browser, legacyHashes.browser], stored: cand.browser_hash },
+            ];
+
+            for (const { key, values, stored } of pairs) {
+              if (!stored) continue;
+              const incoming = values.filter(Boolean);
+              if (incoming.length === 0) continue;
+              total += weights[key];
+              if (incoming.includes(stored)) {
+                score += weights[key];
+                matched.push(key);
+              }
+            }
+
+            const normalized = total > 0 ? score / total : 0;
+
+            // Cross-device link requires: (same IP + ≥1 signal match) OR (≥2 signal matches on any IP)
+            const qualifies = (sameIp && matched.length >= 1) || matched.length >= 2;
+
+            if (qualifies && normalized > linkScore && normalized >= LINK_THRESHOLD) {
+              linkScore = normalized;
+              linkCandidate = cand;
+              linkMatched = matched;
+            }
+          }
+
+          // Create new visitor but LINK to the candidate
+          visitorId = `dvc_${nanoid(16)}`;
+          matchConfidence = 1.0;
+
+          if (linkCandidate) {
+            matchTier = 'cross_device';
+            matchedSignals = linkMatched;
+            await insertAlias(visitorId);
+            // Create device link
+            const linkConf = Math.round(linkScore * 100) / 100;
+            const sameIp = normalizeIp(linkCandidate.ip_address) === normalizedClientIp;
+            const linkType = sameIp ? 'same_network' : 'signal_overlap';
+            await linkDevices(visitorId, linkCandidate.visitor_id, linkType, linkConf);
+          } else {
+            matchTier = 'new';
+            await insertAlias(visitorId);
+          }
+        }
+      }
+    }
+
+    // ─── Linked devices (fetch all links for this visitor + transitive) ───
     const linkedResult = await db.query(
       `SELECT visitor_id_a, visitor_id_b, link_type, confidence, created_at
        FROM device_links
-       WHERE (visitor_id_a = $1 OR visitor_id_b = $1) AND api_key_id = $2`,
+       WHERE (visitor_id_a = $1 OR visitor_id_b = $1) AND api_key_id = $2
+       ORDER BY confidence DESC`,
       [visitorId, apiKeyId]
     );
 
-    // Secondary VPN heuristic: visitor rotating through 4+ distinct public IPs within 1 hour.
-    // Threshold is intentionally high (4+) and window tight (1h) to avoid false-positives from
-    // legitimate multi-device users (e.g. desktop + phone share a fuzzy-matched visitor_id but
-    // have different IPs — WiFi vs mobile data — which must NOT be flagged as VPN).
+    // Collect all linked visitor IDs
+    const linkedVids = linkedResult.rows.map((l: any) =>
+      l.visitor_id_a === visitorId ? l.visitor_id_b : l.visitor_id_a
+    );
+
+    // ─── Cumulative risk: inherit risk flags from linked devices ───
+    // If ANY linked visitor was flagged for VPN/incognito/bot/headless,
+    // this visitor inherits elevated risk — you can't escape by switching devices.
+    let linkedRiskFlags = { vpn: false, incognito: false, headless: false, bot: false };
+    if (linkedVids.length > 0) {
+      const linkedRiskResult = await db.query(
+        `SELECT is_vpn, is_incognito, headless_score, bot_score
+         FROM fingerprints
+         WHERE visitor_id = ANY($1::text[]) AND api_key_id = $2
+         ORDER BY last_seen DESC
+         LIMIT 50`,
+        [linkedVids, apiKeyId]
+      );
+      for (const row of linkedRiskResult.rows) {
+        if (row.is_vpn) linkedRiskFlags.vpn = true;
+        if (row.is_incognito) linkedRiskFlags.incognito = true;
+        if ((row.headless_score || 0) >= 40) linkedRiskFlags.headless = true;
+        if ((row.bot_score || 0) >= 2) linkedRiskFlags.bot = true;
+      }
+    }
+
+    // Secondary VPN heuristic: IP rotation (4+ distinct IPs in 1 hour)
     const recentIpsResult = await db.query(
       `SELECT DISTINCT ip_address
        FROM fingerprints
@@ -639,22 +807,34 @@ app.post('/v1/fingerprint', async (c) => {
       .map((row: any) => normalizeIp(row.ip_address))
       .filter((ip: string) => !!ip && !isPrivateIp(ip));
     const vpnByIpRotation = new Set(distinctRecentPublicIps).size >= 4;
-    const finalIsVpn = isVpn || vpnByIpRotation;
 
-    // ─── Risk scoring ───
+    // IP change detection: if stored_id or exact match found the same person
+    // but the IP is different, that's a network switch (VPN, mobile data, etc.)
+    const vpnByIpSwitch = ipChanged && !isNew;
+
+    const finalIsVpn = isVpn || vpnByIpRotation || vpnByIpSwitch;
+
+    // ─── Risk scoring (cumulative — inherits from linked devices) ───
     let riskScore = 0;
-    if (isNew) riskScore += 15;
-    if (finalIsVpn) riskScore += 25;
-    if (evasion?.isPrivate) riskScore += 20;
+    if (isNew && linkedVids.length === 0) riskScore += 15;   // truly new, no links
+    if (finalIsVpn)                        riskScore += 25;
+    if (evasion?.isPrivate)                riskScore += 20;
     if ((evasion?.headlessScore || 0) > 0.4) riskScore += 30;
-    if (botCount > 0) riskScore += 35;
-    if (linkedResult.rows.length > 3) riskScore += 15;
+    if (botCount > 0)                      riskScore += 35;
+    if (linkedResult.rows.length > 3)      riskScore += 15;   // multi-device cluster
     const tampering = evasion?.tampering || {};
-    if (tampering.canvasOverride) riskScore += 20;
-    if (tampering.uaOverride) riskScore += 15;
-    if (tampering.navigatorProxy) riskScore += 20;
-    if (tampering.genericRenderer) riskScore += 10;
-    if (tampering.screenMismatch) riskScore += 15;
+    if (tampering.canvasOverride)    riskScore += 20;
+    if (tampering.uaOverride)        riskScore += 15;
+    if (tampering.navigatorProxy)    riskScore += 20;
+    if (tampering.genericRenderer)   riskScore += 10;
+    if (tampering.screenMismatch)    riskScore += 15;
+    // Inherited risk from linked devices
+    if (linkedRiskFlags.vpn)         riskScore += 15;
+    if (linkedRiskFlags.bot)         riskScore += 20;
+    if (linkedRiskFlags.headless)    riskScore += 15;
+    if (linkedRiskFlags.incognito)   riskScore += 10;
+    // IP change without VPN detection = suspicious
+    if (ipChanged && !finalIsVpn)    riskScore += 10;
     riskScore = Math.min(100, Math.max(0, riskScore));
 
     return c.json({
@@ -671,6 +851,20 @@ app.post('/v1/fingerprint', async (c) => {
         bot: botCount >= 2,
         tampered: !!(tampering.canvasOverride || tampering.uaOverride || tampering.navigatorProxy),
         multiAccount: linkedResult.rows.length > 1,
+        ipChanged,
+        linkedRisk: linkedRiskFlags,
+      },
+      identity: {
+        linkedDeviceCount: linkedResult.rows.length,
+        linkedVisitorIds: linkedVids,
+        links: linkedResult.rows.map((l: any) => ({
+          visitorId: l.visitor_id_a === visitorId ? l.visitor_id_b : l.visitor_id_a,
+          linkType: l.link_type,
+          confidence: l.confidence,
+          linkedAt: l.created_at,
+        })),
+        previousIp: ipChanged ? previousIp : undefined,
+        currentIp: clientIp,
       },
       signals: {
         collected: signalsCollected,

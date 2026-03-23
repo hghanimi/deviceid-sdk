@@ -264,6 +264,25 @@
       </div>
     </div>
 
+    <!-- Identity Linking KPI Row -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
+      <div class="kpi k-accent">
+        <div class="kpi-label">Linked Identities</div>
+        <div class="kpi-value" id="kpi-linked" style="color:var(--accent)">—</div>
+        <div class="kpi-sub" id="kpi-linked-d">Cross-device links</div>
+      </div>
+      <div class="kpi k-brand">
+        <div class="kpi-label">VPN Detected</div>
+        <div class="kpi-value" id="kpi-vpn" style="color:var(--warn)">—</div>
+        <div class="kpi-sub" id="kpi-vpn-d"></div>
+      </div>
+      <div class="kpi k-warn">
+        <div class="kpi-label">Incognito Detected</div>
+        <div class="kpi-value" id="kpi-incog" style="color:var(--warn)">—</div>
+        <div class="kpi-sub" id="kpi-incog-d"></div>
+      </div>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="panel">
         <div class="panel-head">
@@ -321,9 +340,10 @@
           <th>Risk Score</th>
           <th>IP Address</th>
           <th>Signals</th>
+          <th style="text-align:center">Links</th>
           <th style="text-align:center">Visits</th>
         </tr></thead>
-        <tbody id="events-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading events…</td></tr></tbody>
+        <tbody id="events-tbody"><tr><td colspan="8" class="loading"><div class="spin"></div><br>Loading events…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -347,9 +367,10 @@
           <th>Last Seen</th>
           <th>Risk Score</th>
           <th>Signals</th>
+          <th style="text-align:center">Links</th>
           <th style="text-align:center">Visits</th>
         </tr></thead>
-        <tbody id="identities-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading identities…</td></tr></tbody>
+        <tbody id="identities-tbody"><tr><td colspan="8" class="loading"><div class="spin"></div><br>Loading identities…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -405,8 +426,9 @@ sdk.identify().then(result =&gt; {
   console.log(result.visitorId);     // stable device ID
   console.log(result.riskScore);     // 0-100
   console.log(result.confidence);    // match certainty
-  console.log(result.signals);       // 22 signal breakdown
-  console.log(result.riskSignals);   // vpn, bot, incognito, headless
+  console.log(result.matchTier);     // stored_id | exact | fuzzy | cross_device | new
+  console.log(result.identity);      // linked devices &amp; cross-device graph
+  console.log(result.riskSignals);   // vpn, bot, incognito, ipChanged, linkedRisk
   console.log(result.geo);           // country, city, ASN
 });</div>
 
@@ -418,12 +440,21 @@ sdk.identify().then(result =&gt; {
   "visitorId": "dvc_a1b2c3d4e5f6",
   "isNew": false,
   "confidence": 0.92,
-  "matchTier": "fuzzy",          // exact | fuzzy | new
+  "matchTier": "stored_id",      // stored_id | exact | fuzzy | cross_device | new
   "matchedSignals": ["canvas", "webgl", "fonts", "browser", "audio"],
   "riskScore": 15,
   "riskSignals": {
     "vpn": false, "incognito": false, "headless": false,
-    "bot": false, "tampered": false, "multiAccount": false
+    "bot": false, "tampered": false, "multiAccount": false,
+    "ipChanged": true,
+    "linkedRisk": { "vpn": false, "incognito": false, "headless": false, "bot": false }
+  },
+  "identity": {
+    "linkedDeviceCount": 2,
+    "linkedVisitorIds": ["dvc_x9y8z7..."],
+    "links": [{ "visitorId": "dvc_x9y8z7...", "linkType": "same_network", "confidence": 0.45 }],
+    "previousIp": "203.0.113.5",
+    "currentIp": "203.0.113.1"
   },
   "signals": {
     "collected": 19,             // out of 22 total
@@ -441,6 +472,7 @@ sdk.identify().then(result =&gt; {
   },
   "ip": "203.0.113.1",
   "geo": { "country": "IQ", "city": "Baghdad", "timezone": "Asia/Baghdad", "asOrganization": "..." },
+  "linkedDevices": 2,
   "processingMs": 42,
   "sdkVersion": "3.0.0"
 }</div>
@@ -545,6 +577,14 @@ sdk.identify().then(result =&gt; {
     document.getElementById('kpi-risk-d').textContent = `${ov.high_risk_24h} flagged events`;
     setKpi('kpi-avgrisk', avgRisk, avgRisk >= 40 ? 'danger' : avgRisk >= 20 ? 'warn' : 'ok');
     document.getElementById('kpi-avgrisk-d').textContent = avgRisk >= 40 ? 'Elevated' : avgRisk >= 20 ? 'Moderate' : 'Healthy';
+
+    // Identity linking KPIs
+    setKpi('kpi-linked', (ov.linked_identities || 0).toLocaleString(), null);
+    document.getElementById('kpi-linked-d').textContent = 'Cross-device linked visitors';
+    setKpi('kpi-vpn', (ov.vpn_24h || 0).toLocaleString(), null);
+    document.getElementById('kpi-vpn-d').textContent = 'VPN/proxy sessions today';
+    setKpi('kpi-incog', (ov.incognito_24h || 0).toLocaleString(), null);
+    document.getElementById('kpi-incog-d').textContent = 'Private browsing sessions';
 
     renderChart();
     renderSignalCoverage();
@@ -670,6 +710,10 @@ sdk.identify().then(result =&gt; {
     document.getElementById('evts-count').textContent = evs.length + ' events';
     document.getElementById('events-tbody').innerHTML = evs.map(e => {
       const risk = calcRisk(e);
+      const lc = e.linkedCount || 0;
+      const linkBadge = lc > 0
+        ? `<span class="badge b-accent" title="${lc} linked device(s)">&#x1F517; ${lc}</span>`
+        : '<span class="badge b-muted">—</span>';
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
         <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.lastSeen)}</td>
         <td><span class="mono" style="color:var(--brand)">${esc((e.visitorId||'').substring(0,20))}…</span></td>
@@ -677,9 +721,10 @@ sdk.identify().then(result =&gt; {
         <td>${riskPill(risk)}</td>
         <td class="mono" style="font-size:11px">${esc(e.ipAddress||'—')}</td>
         <td><div class="sigs">${sigBadges(e)}</div></td>
+        <td style="text-align:center">${linkBadge}</td>
         <td style="text-align:center"><span class="badge b-muted">${e.visitCount||1}</span></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="7" class="loading">No events match</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="loading">No events match</td></tr>';
   }
 
   // ── Identities ──
@@ -697,6 +742,10 @@ sdk.identify().then(result =&gt; {
     document.getElementById('ids-count').textContent = ids.length + ' identities';
     document.getElementById('identities-tbody').innerHTML = ids.map(e => {
       const risk = calcRisk(e);
+      const lc = e.linkedCount || 0;
+      const linkBadge = lc > 0
+        ? `<span class="badge b-accent" title="${lc} linked device(s)">&#x1F517; ${lc}</span>`
+        : '<span class="badge b-muted">Solo</span>';
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
         <td><span class="mono" style="color:var(--brand)">${esc(e.visitorId||'—')}</span></td>
         <td>${esc(e.merchantName||'—')}</td>
@@ -704,9 +753,10 @@ sdk.identify().then(result =&gt; {
         <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.lastSeen)}</td>
         <td>${riskPill(risk)}</td>
         <td><div class="sigs">${sigBadges(e)}</div></td>
+        <td style="text-align:center">${linkBadge}</td>
         <td style="text-align:center"><span class="badge b-brand">${e.visitCount||1}</span></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="7" class="loading">No identities found</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="loading">No identities found</td></tr>';
   }
 
   // ── Developers ──
@@ -815,17 +865,31 @@ sdk.identify().then(result =&gt; {
         <div class="dr"><span class="dk">Merchant</span><span class="dv">${esc(v.merchantName || '—')}</span></div>
       </div>
 
-      <!-- Linked Devices -->
+      <!-- Linked Devices / Identity Graph -->
       <div class="so-sec">
         <div class="so-sec-title">Identity Graph <span class="so-sec-count">${linked.length} linked</span></div>
-        ${linked.length > 0 ? linked.map(l => `
-          <div class="dr">
-            <span class="mono" style="color:var(--brand);font-size:11px">${esc((l.linkedId||'').substring(0,22))}…</span>
-            <div style="display:flex;gap:5px">
-              <span class="badge b-muted">${esc(l.linkType||'linked')}</span>
-              ${riskPill(Math.round((l.confidence||0)*100))}
+        ${linked.length > 0 ? `
+          <div style="background:var(--accent-dim);border:1px solid rgba(129,140,248,0.15);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">&#x1F517;</span>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--accent)">Same Person · ${linked.length} Device${linked.length > 1 ? 's' : ''} Linked</div>
+              <div style="font-size:10px;color:var(--muted)">Cross-device identity resolution active</div>
             </div>
-          </div>`).join('') : '<div style="color:var(--muted);font-size:12px;padding:4px 0">No linked devices recorded</div>'}
+          </div>
+          ${linked.map(l => `
+          <div class="dr" style="padding:9px 0">
+            <div>
+              <span class="mono" style="color:var(--brand);font-size:11px;cursor:pointer" onclick="openVisitor('${esc(l.linkedId)}')">${esc((l.linkedId||'').substring(0,22))}…</span>
+              <div style="margin-top:3px">
+                <span class="badge ${l.linkType === 'same_network' ? 'b-brand' : l.linkType === 'stored_id' ? 'b-ok' : 'b-accent'}">${esc(l.linkType === 'same_network' ? '📡 Same Network' : l.linkType === 'stored_id' ? '🔑 Stored ID' : '🔗 Signal Overlap')}</span>
+              </div>
+            </div>
+            <div style="text-align:right">
+              ${riskPill(Math.round((l.confidence||0)*100))}
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">${l.linkedAt ? new Date(l.linkedAt).toLocaleDateString() : ''}</div>
+            </div>
+          </div>`).join('')}
+        ` : '<div style="color:var(--muted);font-size:12px;padding:4px 0">No linked devices — single device identity</div>'}
       </div>
     `;
   }
