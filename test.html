@@ -541,6 +541,7 @@ sdk.identify().then(result =&gt; {
     try {
       const res = await fetch(`${API}/v1/dashboard`, { headers: { 'x-api-key': KEY } });
       data = await res.json();
+      if (data.error) { console.error('Dashboard API error:', data.error, data.details); return; }
       allEvents = data.allEvents || data.riskyEvents || [];
       const map = new Map();
       allEvents.forEach(e => { if (!map.has(e.visitorId)) map.set(e.visitorId, e); });

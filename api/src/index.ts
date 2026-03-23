@@ -216,7 +216,7 @@ app.get('/v1/dashboard', async (c) => {
            SELECT visitor_id_b AS visitor_id FROM device_links
          ) sub
          GROUP BY sub.visitor_id`
-      ),
+      ).catch(() => ({ rows: [] })),
     ]);
 
     // Build a map of visitor_id → link count
