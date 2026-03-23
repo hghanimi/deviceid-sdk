@@ -310,15 +310,15 @@ app.get('/v1/visitor/:id', async (c) => {
       isIncognito: p.is_incognito,
       headlessScore: p.headless_score,
       botScore: p.bot_score,
-      hashes: {
-        canvas: p.canvas_hash,
-        webgl: p.webgl_hash,
-        audio: p.audio_hash,
-        screen: p.screen_hash,
-        fonts: p.font_hash,
-        browser: p.browser_hash,
-        hardware: p.hardware_hash,
-      },
+      signalGroups: [
+        { name: 'Canvas',   hash: p.canvas_hash,   signals: ['Canvas rendering'],                   icon: 'render' },
+        { name: 'WebGL',    hash: p.webgl_hash,    signals: ['WebGL params', 'Pixel render hash'],  icon: 'gpu' },
+        { name: 'Audio',    hash: p.audio_hash,    signals: ['Audio pipeline'],                     icon: 'audio' },
+        { name: 'Screen',   hash: p.screen_hash,   signals: ['Screen info', 'ClientRects/DOMRect'], icon: 'display' },
+        { name: 'Fonts',    hash: p.font_hash,     signals: ['System fonts', 'Arabic fonts', 'Emoji render'], icon: 'type' },
+        { name: 'Browser',  hash: p.browser_hash,  signals: ['Intl API probe', 'CSS.supports()', 'Media codecs', 'SpeechSynthesis voices'], icon: 'browser' },
+        { name: 'Hardware', hash: p.hardware_hash, signals: ['Hardware specs', 'MathML render', 'Browser basics'], icon: 'cpu' },
+      ].filter(g => g.hash),
       linkedDevices: links.rows.map((l: any) => ({
         linkedId: l.visitor_id_a === visitorId ? l.visitor_id_b : l.visitor_id_a,
         linkType: l.link_type,
@@ -364,39 +364,43 @@ app.post('/v1/fingerprint', async (c) => {
       hardware:  h(signals.hardware),
     };
 
-    // v3-enhanced grouped hashes (stored in existing DB columns, no schema migration needed)
+    // v3 optimized grouped hashes — volatile signals (storageQuota, permissions, timezone)
+    // excluded from matching hashes to prevent unnecessary mismatches.
+    // Each group pairs signals with similar stability and entropy.
     const hashes = {
       composite: legacyHashes.composite,
-      canvas: h(signals.canvas),
-      webgl: h({
-        webgl: signals.webgl,
-        webglRender: signals.webglRender,
+      canvas: h(signals.canvas),                                                    // rendering fingerprint
+      webgl: h({ webgl: signals.webgl, webglRender: signals.webglRender }),          // GPU identity (pixel-level)
+      audio: h(signals.audio),                                                       // audio pipeline
+      screen: h({ screen: signals.screen, clientRects: signals.clientRects }),        // display geometry
+      fonts: h({                                                                     // glyph environment
+        fonts: signals.fonts, arabicFonts: signals.arabicFonts, emoji: signals.emoji,
       }),
-      audio: h(signals.audio),
-      screen: h({
-        screen: signals.screen,
-        clientRects: signals.clientRects,
+      browser: h({                                                                   // deep platform probe (HIGH ENTROPY)
+        intlProbe: signals.intlProbe, cssSupports: signals.cssSupports,
+        codecs: signals.codecs, voices: signals.voices,
       }),
-      fonts: h({
-        fonts: signals.fonts,
-        arabicFonts: signals.arabicFonts,
-      }),
-      browser: h({
-        browser: signals.browser,
-        timezone: signals.timezone,
-        intlProbe: signals.intlProbe,
-        voices: signals.voices,
-        permissions: signals.permissions,
-        cssSupports: signals.cssSupports,
-        codecs: signals.codecs,
-        storageQuota: signals.storageQuota,
-      }),
-      hardware: h({
-        hardware: signals.hardware,
-        emoji: signals.emoji,
-        mathml: signals.mathml,
+      hardware: h({                                                                  // basic platform identity
+        hardware: signals.hardware, mathml: signals.mathml, browser: signals.browser,
       }),
     };
+
+    // Individual signal hashes for all 22 signals — returned in API response for transparency
+    const signalNames = [
+      'canvas', 'webgl', 'webglRender', 'audio', 'screen', 'clientRects',
+      'fonts', 'arabicFonts', 'emoji', 'voices', 'codecs', 'cssSupports',
+      'permissions', 'storageQuota', 'mathml', 'intlProbe', 'hardware',
+      'browser', 'timezone',
+    ];
+    const signalHashes: Record<string, string> = {};
+    let signalsCollected = 0;
+    for (const name of signalNames) {
+      const val = signals[name];
+      if (val !== null && val !== undefined) {
+        signalHashes[name] = h(val);
+        signalsCollected++;
+      }
+    }
 
     // headlessScore is a 0-1 float; cast to 0-100 integer for the INTEGER DB column
     const headlessScoreInt = Math.round((evasion?.headlessScore || 0) * 100);
@@ -510,15 +514,19 @@ app.post('/v1/fingerprint', async (c) => {
         [apiKeyId]
       );
 
-      // Signal weights — ordered by spoofing difficulty
+      // Signal weights — rebalanced for v3 signal groups.
+      // browser group (intlProbe + cssSupports + codecs + voices) gets highest weight:
+      // intlProbe alone tests 6 number locales, 3 date locales, Hijri calendar,
+      // Arabic plurals, collation, and supported-locales — the MENA differentiator.
+      // Volatile signals (storageQuota, permissions, timezone) excluded from matching.
       const weights: Record<string, number> = {
-        screen: 0.18,
-        fonts: 0.16,
-        hardware: 0.16,
-        webgl: 0.14,
-        browser: 0.14,
-        canvas: 0.12,
-        audio: 0.10,
+        browser:  0.20,   // intlProbe + cssSupports + codecs + voices — highest entropy
+        webgl:    0.16,   // GPU pixel render + params — very stable, hard to spoof
+        fonts:    0.16,   // fonts + arabicFonts + emoji — glyph environment
+        canvas:   0.14,   // browser rendering — high entropy
+        screen:   0.12,   // screen + clientRects — display geometry
+        hardware: 0.12,   // hardware + mathml + browser basics
+        audio:    0.10,   // audio fingerprint
       };
 
       let bestScore = 0;
@@ -551,9 +559,11 @@ app.post('/v1/fingerprint', async (c) => {
           }
         }
 
-        const stableMatches = ['screen', 'fonts', 'hardware', 'webgl'].filter((key) => matched.includes(key)).length;
-        if (stableMatches >= 3) score += 0.06;
-        if (stableMatches >= 2 && normalizeIp(cand.ip_address) === normalizedClientIp) score += 0.04;
+        // Bonus: high-entropy signals (canvas, webgl, fonts, browser) are hardest to spoof.
+        // Matching 3+ is strong evidence of same device even if other signals changed.
+        const highEntropyMatches = ['canvas', 'webgl', 'fonts', 'browser'].filter((k) => matched.includes(k)).length;
+        if (highEntropyMatches >= 3) score += 0.08;
+        if (highEntropyMatches >= 2 && normalizeIp(cand.ip_address) === normalizedClientIp) score += 0.04;
 
         const normalized = total > 0 ? score / total : 0;
         if (normalized > bestScore) {
@@ -661,6 +671,29 @@ app.post('/v1/fingerprint', async (c) => {
         bot: botCount >= 2,
         tampered: !!(tampering.canvasOverride || tampering.uaOverride || tampering.navigatorProxy),
         multiAccount: linkedResult.rows.length > 1,
+      },
+      signals: {
+        collected: signalsCollected,
+        total: signalNames.length,
+        hashes: signalHashes,
+        groups: {
+          canvas:   { hash: hashes.canvas,   signals: ['canvas'] },
+          webgl:    { hash: hashes.webgl,    signals: ['webgl', 'webglRender'] },
+          audio:    { hash: hashes.audio,    signals: ['audio'] },
+          screen:   { hash: hashes.screen,   signals: ['screen', 'clientRects'] },
+          fonts:    { hash: hashes.fonts,    signals: ['fonts', 'arabicFonts', 'emoji'] },
+          browser:  { hash: hashes.browser,  signals: ['intlProbe', 'cssSupports', 'codecs', 'voices'] },
+          hardware: { hash: hashes.hardware, signals: ['hardware', 'mathml', 'browser'] },
+        },
+      },
+      ip: clientIp,
+      geo: {
+        country: cfData.country || null,
+        region: cfData.region || null,
+        city: cfData.city || null,
+        timezone: cfData.timezone || null,
+        asn: cfData.asn || null,
+        asOrganization: cfData.asOrganization || null,
       },
       linkedDevices: linkedResult.rows.length,
       processingMs: Date.now() - startTime,

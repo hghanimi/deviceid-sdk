@@ -3,249 +3,293 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wayl — Risk Intelligence Console</title>
+  <title>Wayl — Device Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:         #060d14;
-      --sidebar:    #07101a;
-      --panel:      #0b1520;
-      --panel-b:    #0e1d2c;
-      --border:     rgba(255,255,255,0.06);
-      --border-2:   rgba(255,255,255,0.11);
-      --text:       #d9e8f5;
-      --muted:      #4f6678;
-      --brand:      #00d4a0;
-      --brand-dim:  rgba(0,212,160,0.08);
+      --bg:         #07090f;
+      --sidebar:    #0b0e16;
+      --panel:      #0f1219;
+      --panel-2:    #141820;
+      --card:       #12161e;
+      --border:     rgba(255,255,255,0.05);
+      --border-2:   rgba(255,255,255,0.09);
+      --text:       #e2e8f0;
+      --text-2:     #94a3b8;
+      --muted:      #64748b;
+      --brand:      #10b981;
+      --brand-2:    #34d399;
+      --brand-dim:  rgba(16,185,129,0.08);
+      --accent:     #818cf8;
+      --accent-dim: rgba(129,140,248,0.10);
       --ok:         #10b981;
-      --ok-dim:     rgba(16,185,129,0.10);
+      --ok-dim:     rgba(16,185,129,0.08);
       --warn:       #f59e0b;
-      --warn-dim:   rgba(245,158,11,0.10);
-      --danger:     #ef4466;
-      --danger-dim: rgba(239,68,102,0.10);
-      --font:       'Inter', system-ui, sans-serif;
-      --mono:       'JetBrains Mono', 'Roboto Mono', monospace;
+      --warn-dim:   rgba(245,158,11,0.08);
+      --danger:     #ef4444;
+      --danger-dim: rgba(239,68,68,0.08);
+      --font:       'Inter', -apple-system, system-ui, sans-serif;
+      --mono:       'JetBrains Mono', 'SF Mono', monospace;
+      --radius:     8px;
+      --radius-lg:  12px;
     }
     html, body { height: 100%; overflow: hidden; }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; font-size: 13px; line-height: 1.5; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 
     /* ── SIDEBAR ── */
-    .sidebar { width: 210px; min-width: 210px; height: 100vh; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-    .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid var(--border); }
-    .logo-mark { width: 28px; height: 28px; background: var(--brand); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #04100c; flex-shrink: 0; }
-    .logo-name { font-weight: 700; font-size: 14px; letter-spacing: 0.02em; }
-    .logo-tag  { font-size: 10px; color: var(--muted); }
-    .sidebar-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
-    .nav-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 10px 8px 4px; }
-    .nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 7px; cursor: pointer; color: var(--muted); transition: all 0.12s; user-select: none; font-size: 13px; font-weight: 500; }
-    .nav-item:hover { background: var(--brand-dim); color: var(--text); }
+    .sidebar { width: 220px; min-width: 220px; height: 100vh; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+    .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 18px 16px; border-bottom: 1px solid var(--border); }
+    .logo-mark { width: 30px; height: 30px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; flex-shrink: 0; }
+    .logo-name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+    .logo-tag  { font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+    .sidebar-nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+    .nav-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 14px 8px 6px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius); cursor: pointer; color: var(--muted); transition: all 0.15s; user-select: none; font-size: 13px; font-weight: 500; }
+    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
     .nav-item.active { background: var(--brand-dim); color: var(--brand); font-weight: 600; }
-    .nav-badge { margin-left: auto; background: var(--danger); color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; padding: 1px 6px; display: none; }
+    .nav-badge { margin-left: auto; background: var(--danger); color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; padding: 1px 7px; display: none; line-height: 1.5; }
     .nav-badge.show { display: inline-block; }
-    .sidebar-footer { padding: 12px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
-    .status-dot { display: inline-block; width: 6px; height: 6px; background: var(--ok); border-radius: 50%; margin-right: 5px; }
+    .sidebar-footer { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+    .status-dot { display: inline-block; width: 7px; height: 7px; background: var(--ok); border-radius: 50%; margin-right: 6px; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
 
     /* ── MAIN ── */
     .main { flex: 1; height: 100vh; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
-    .topbar { height: 50px; min-height: 50px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 22px; gap: 10px; }
-    .topbar-title { font-size: 14px; font-weight: 600; }
+    .topbar { height: 52px; min-height: 52px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 10px; }
+    .topbar-title { font-size: 15px; font-weight: 700; }
     .topbar-sub { font-size: 12px; color: var(--muted); flex: 1; }
-    .btn-sm { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-2); background: transparent; color: var(--text); font-family: var(--font); transition: all 0.12s; }
-    .btn-sm:hover { background: var(--panel-b); border-color: var(--brand); color: var(--brand); }
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--radius); font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-2); background: transparent; color: var(--text); font-family: var(--font); transition: all 0.15s; }
+    .btn:hover { background: var(--panel-2); border-color: var(--brand); color: var(--brand); }
+    .btn-brand { background: var(--brand); color: #000; border-color: var(--brand); }
+    .btn-brand:hover { background: var(--brand-2); border-color: var(--brand-2); }
 
     /* ── PAGES ── */
-    .page { flex: 1; overflow-y: auto; padding: 18px 22px; display: none; }
+    .page { flex: 1; overflow-y: auto; padding: 20px 24px; display: none; }
     .page.active { display: block; }
 
-    /* ── KPI ROW ── */
-    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-    .kpi-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
-    .kpi-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 8px; }
-    .kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
-    .kpi-delta { font-size: 11px; color: var(--muted); margin-top: 5px; }
-    .c-ok { color: var(--ok); } .c-warn { color: var(--warn); } .c-danger { color: var(--danger); } .c-brand { color: var(--brand); }
+    /* ── KPI GRID ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; position: relative; overflow: hidden; }
+    .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.6; }
+    .kpi.k-brand::before { background: var(--brand); }
+    .kpi.k-accent::before { background: var(--accent); }
+    .kpi.k-warn::before { background: var(--warn); }
+    .kpi.k-danger::before { background: var(--danger); }
+    .kpi.k-ok::before { background: var(--ok); }
+    .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+    .kpi-value { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    .kpi-sub { font-size: 11px; color: var(--text-2); margin-top: 6px; }
 
     /* ── PANELS ── */
-    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
-    .panel-head { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 8px; }
-    .panel-title { font-size: 13px; font-weight: 600; flex: 1; }
-    .panel-body { padding: 16px; }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 16px; }
+    .panel-head { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 10px; }
+    .panel-title { font-size: 13px; font-weight: 700; flex: 1; }
+    .panel-body { padding: 18px; }
+    .panel-sub { font-size: 11px; color: var(--muted); }
 
     /* ── TABLE ── */
     .tbl-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
-    th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--panel-b); }
-    td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+    th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--panel-2); }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
-    tr.clk { cursor: pointer; transition: background 0.1s; }
-    tr.clk:hover td { background: var(--brand-dim); }
+    tr.clk { cursor: pointer; transition: background 0.12s; }
+    tr.clk:hover td { background: rgba(16,185,129,0.04); }
     .mono { font-family: var(--mono); font-size: 11px; }
 
     /* ── BADGES ── */
-    .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; white-space: nowrap; }
-    .b-ok     { background: var(--ok-dim);     color: var(--ok);     border: 1px solid rgba(16,185,129,0.2); }
-    .b-warn   { background: var(--warn-dim);   color: var(--warn);   border: 1px solid rgba(245,158,11,0.2); }
-    .b-danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(239,68,102,0.2); }
-    .b-muted  { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
-    .b-brand  { background: var(--brand-dim);  color: var(--brand);  border: 1px solid rgba(0,212,160,0.2); }
+    .badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; white-space: nowrap; letter-spacing: 0.02em; }
+    .b-ok     { background: var(--ok-dim);     color: var(--ok);     border: 1px solid rgba(16,185,129,0.15); }
+    .b-warn   { background: var(--warn-dim);   color: var(--warn);   border: 1px solid rgba(245,158,11,0.15); }
+    .b-danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(239,68,68,0.15); }
+    .b-muted  { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
+    .b-brand  { background: var(--brand-dim);  color: var(--brand);  border: 1px solid rgba(16,185,129,0.15); }
+    .b-accent { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(129,140,248,0.15); }
 
-    /* ── CONFIDENCE PILL ── */
-    .cpill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-family: var(--mono); font-size: 11px; font-weight: 700; min-width: 46px; text-align: center; }
-    .cp-hi { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
-    .cp-md { background: rgba(245,158,11,0.12);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
-    .cp-lo { background: rgba(239,68,102,0.12); color: #ef4466; border: 1px solid rgba(239,68,102,0.25); }
+    /* ── RISK PILL ── */
+    .rpill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-family: var(--mono); font-size: 11px; font-weight: 600; min-width: 50px; text-align: center; }
+    .rp-low  { background: rgba(16,185,129,0.10); color: #10b981; border: 1px solid rgba(16,185,129,0.20); }
+    .rp-med  { background: rgba(245,158,11,0.10); color: #f59e0b; border: 1px solid rgba(245,158,11,0.20); }
+    .rp-high { background: rgba(239,68,68,0.10); color: #ef4444; border: 1px solid rgba(239,68,68,0.20); }
 
-    /* ── SIGNALS ── */
-    .sigs { display: flex; gap: 3px; flex-wrap: wrap; }
+    /* ── SIGNAL BAR ── */
+    .sig-bar { display: flex; align-items: center; gap: 6px; }
+    .sig-bar-fill { height: 4px; border-radius: 2px; background: var(--border-2); flex: 1; max-width: 80px; position: relative; overflow: hidden; }
+    .sig-bar-fill > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; transition: width 0.3s; }
+    .sig-bar-label { font-family: var(--mono); font-size: 10px; color: var(--text-2); min-width: 32px; }
 
     /* ── CHART ── */
-    .chart-wrap { position: relative; height: 175px; }
+    .chart-wrap { position: relative; height: 180px; }
 
     /* ── FILTER BAR ── */
-    .filter-bar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--panel-b); flex-wrap: wrap; align-items: center; }
-    .fi { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--font); font-size: 12px; padding: 5px 10px; outline: none; }
+    .filter-bar { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); flex-wrap: wrap; align-items: center; }
+    .fi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 12px; padding: 6px 12px; outline: none; transition: border-color 0.15s; }
     .fi:focus { border-color: var(--brand); }
-    input.fi { flex: 1; min-width: 160px; }
-    .fi-count { font-size: 11px; color: var(--muted); margin-left: auto; }
+    input.fi { flex: 1; min-width: 180px; }
+    .fi-count { font-size: 11px; color: var(--muted); margin-left: auto; font-weight: 500; }
 
     /* ── SLIDE-OUT ── */
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(2px); }
     .overlay.open { opacity: 1; pointer-events: all; }
-    .slideout { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; background: var(--panel); border-left: 1px solid var(--border-2); z-index: 101; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.22s cubic-bezier(0.22,0.58,0.12,1); overflow: hidden; }
+    .slideout { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; background: var(--panel); border-left: 1px solid var(--border-2); z-index: 101; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.25s cubic-bezier(0.22,0.58,0.12,1); overflow: hidden; }
     .slideout.open { transform: translateX(0); }
-    .so-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
+    .so-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; background: var(--panel-2); }
     .so-body { flex: 1; overflow-y: auto; }
-    .btn-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 20px; padding: 0; line-height: 1; margin-left: auto; }
-    .btn-x:hover { color: var(--text); }
-    .so-sec { padding: 12px 18px; border-bottom: 1px solid var(--border); }
+    .btn-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 22px; padding: 2px 4px; line-height: 1; margin-left: auto; border-radius: 4px; transition: all 0.1s; }
+    .btn-x:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+    .so-sec { padding: 16px 20px; border-bottom: 1px solid var(--border); }
     .so-sec:last-child { border-bottom: none; }
-    .so-sec-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
-    .dr { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px; }
+    .so-sec-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .so-sec-count { font-weight: 600; color: var(--text-2); }
+    .dr { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 12px; }
     .dr + .dr { border-top: 1px solid var(--border); }
-    .dk { color: var(--muted); }
-    .dv { font-family: var(--mono); font-size: 11px; }
-    .hash-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
-    .hash-row:last-child { border-bottom: none; }
-    .hash-lbl { font-size: 12px; color: var(--muted); }
-    .hash-val { font-family: var(--mono); font-size: 10px; opacity: 0.6; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk { color: var(--muted); font-weight: 500; }
+    .dv { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+
+    /* ── SIGNAL GROUP CARD ── */
+    .sg-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+    .sg-card:last-child { margin-bottom: 0; }
+    .sg-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; transition: background 0.12s; }
+    .sg-head:hover { background: rgba(255,255,255,0.02); }
+    .sg-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+    .sg-icon.render  { background: rgba(168,85,247,0.12); color: #a855f7; }
+    .sg-icon.gpu     { background: rgba(59,130,246,0.12); color: #3b82f6; }
+    .sg-icon.audio   { background: rgba(236,72,153,0.12); color: #ec4899; }
+    .sg-icon.display { background: rgba(6,182,212,0.12); color: #06b6d4; }
+    .sg-icon.type    { background: rgba(245,158,11,0.12); color: #f59e0b; }
+    .sg-icon.browser { background: rgba(16,185,129,0.12); color: #10b981; }
+    .sg-icon.cpu     { background: rgba(129,140,248,0.12); color: #818cf8; }
+    .sg-name { font-size: 12px; font-weight: 600; flex: 1; }
+    .sg-hash { font-family: var(--mono); font-size: 10px; color: var(--muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sg-signals { padding: 0 14px 12px; }
+    .sg-sig { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 11px; color: var(--text-2); }
+    .sg-sig::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--border-2); flex-shrink: 0; }
+    .sg-sig.active::before { background: var(--brand); box-shadow: 0 0 4px rgba(16,185,129,0.4); }
 
     /* ── DEV PAGE ── */
-    .code-block { background: #04090f; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-family: var(--mono); font-size: 11px; color: #8ecdf0; overflow-x: auto; white-space: pre; margin: 6px 0 12px; }
-    .copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 5px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: var(--font); transition: all 0.12s; }
+    .code-block { background: #04070c; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: var(--mono); font-size: 11px; color: #93c5fd; overflow-x: auto; white-space: pre; margin: 6px 0 14px; line-height: 1.6; }
+    .copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: var(--font); transition: all 0.12s; }
     .copy-btn:hover { border-color: var(--brand); color: var(--brand); }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
     /* ── MISC ── */
     .loading { text-align: center; padding: 40px 0; color: var(--muted); }
-    .spin { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border-2); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 8px; }
+    .spin { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border-2); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 8px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    .sigs { display: flex; gap: 4px; flex-wrap: wrap; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 800px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .slideout { width: 100%; } }
   </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════════
-     SIDEBAR
-══════════════════════════════════════════════════════ -->
+<!-- ══ SIDEBAR ══ -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark">W</div>
     <div>
       <div class="logo-name">Wayl</div>
-      <div class="logo-tag">Risk Intelligence</div>
+      <div class="logo-tag">Device Intelligence</div>
     </div>
   </div>
-
   <nav class="sidebar-nav">
     <div class="nav-label">Monitor</div>
-
     <div class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z"/></svg>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z"/></svg>
       Overview
     </div>
-
     <div class="nav-item" data-tab="events" onclick="switchTab('events')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h8v1H2v-1z"/></svg>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h8v1H2v-1z"/></svg>
       Event Logs
       <span class="nav-badge" id="riskBadge">0</span>
     </div>
-
     <div class="nav-item" data-tab="identities" onclick="switchTab('identities')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-3 10-3 10 0H3z"/></svg>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-3 10-3 10 0H3z"/></svg>
       Identities
     </div>
-
     <div class="nav-label">Configure</div>
-
     <div class="nav-item" data-tab="developers" onclick="switchTab('developers')">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.7 4.3L1 8l4.7 3.7.6-.8L2.6 8l3.7-2.9-.6-.8zm4.6 0l-.6.8L13.4 8l-3.7 2.9.6.8L15 8l-4.7-3.7z"/></svg>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.7 4.3L1 8l4.7 3.7.6-.8L2.6 8l3.7-2.9-.6-.8zm4.6 0l-.6.8L13.4 8l-3.7 2.9.6.8L15 8l-4.7-3.7z"/></svg>
       Developers
     </div>
   </nav>
-
   <div class="sidebar-footer">
     <div><span class="status-dot"></span>API Connected</div>
-    <div id="lastRefresh" style="margin-top:4px;">—</div>
+    <div id="lastRefresh" style="margin-top:5px;">—</div>
   </div>
 </aside>
 
-<!-- ══════════════════════════════════════════════════════
-     MAIN
-══════════════════════════════════════════════════════ -->
+<!-- ══ MAIN ══ -->
 <div class="main">
   <div class="topbar">
     <div class="topbar-title" id="pageTitle">Overview</div>
     <div class="topbar-sub" id="pageSub">24h rolling window · Auto-refreshes every 30s</div>
-    <button class="btn-sm" onclick="loadDashboard(true)">↻ Refresh</button>
+    <button class="btn" onclick="loadDashboard(true)">&#x21bb; Refresh</button>
   </div>
 
-  <!-- ═══ OVERVIEW ═══ -->
+  <!-- === OVERVIEW === -->
   <div id="page-overview" class="page active">
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">Total Events (24h)</div>
+    <div class="kpi-grid">
+      <div class="kpi k-brand">
+        <div class="kpi-label">Total Events</div>
         <div class="kpi-value c-brand" id="kpi-events">—</div>
-        <div class="kpi-delta" id="kpi-events-d">Loading…</div>
+        <div class="kpi-sub" id="kpi-events-d">Loading…</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Unique Visitors (24h)</div>
-        <div class="kpi-value" id="kpi-visitors">—</div>
-        <div class="kpi-delta" id="kpi-visitors-d"></div>
+      <div class="kpi k-accent">
+        <div class="kpi-label">Unique Visitors</div>
+        <div class="kpi-value" id="kpi-visitors" style="color:var(--accent)">—</div>
+        <div class="kpi-sub" id="kpi-visitors-d"></div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Avg Risk Score (24h)</div>
-        <div class="kpi-value" id="kpi-conf">—</div>
-        <div class="kpi-delta" id="kpi-conf-d"></div>
+      <div class="kpi k-ok">
+        <div class="kpi-label">New Devices</div>
+        <div class="kpi-value" id="kpi-new" style="color:var(--ok)">—</div>
+        <div class="kpi-sub" id="kpi-new-d">First-time visitors</div>
       </div>
-      <div class="kpi-card">
+      <div class="kpi k-danger">
         <div class="kpi-label">High Risk Rate</div>
         <div class="kpi-value" id="kpi-risk">—</div>
-        <div class="kpi-delta" id="kpi-risk-d"></div>
+        <div class="kpi-sub" id="kpi-risk-d"></div>
+      </div>
+      <div class="kpi k-warn">
+        <div class="kpi-label">Avg Risk Score</div>
+        <div class="kpi-value" id="kpi-avgrisk">—</div>
+        <div class="kpi-sub" id="kpi-avgrisk-d"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Events · 24h</div>
+          <span class="badge b-ok" style="font-size:10px">Trusted</span>
+          <span class="badge b-danger" style="font-size:10px">High Risk</span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Signal Coverage</div>
+          <div class="panel-sub">22 signals · v3 SDK</div>
+        </div>
+        <div class="panel-body" id="signal-coverage-body">
+          <div class="loading">Loading…</div>
+        </div>
       </div>
     </div>
 
     <div class="panel">
       <div class="panel-head">
-        <div class="panel-title">Events Trend · 24h</div>
-        <span class="badge b-ok" style="font-size:10px">Trusted</span>
-        <span class="badge b-danger" style="font-size:10px">High Risk</span>
-      </div>
-      <div class="panel-body">
-        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">Merchants (24h)</div>
-        <span id="merchant-count" style="font-size:11px;color:var(--muted)"></span>
+        <div class="panel-title">Merchants</div>
+        <span id="merchant-count" class="panel-sub"></span>
       </div>
       <div class="tbl-wrap">
         <table>
@@ -256,7 +300,7 @@
     </div>
   </div>
 
-  <!-- ═══ EVENT LOGS ═══ -->
+  <!-- === EVENT LOGS === -->
   <div id="page-events" class="page" style="padding:0;display:flex;flex-direction:column;">
     <div class="filter-bar">
       <input class="fi" type="text" id="evtSearch" placeholder="Search visitor ID, IP, merchant…" oninput="applyFilter()" />
@@ -269,34 +313,50 @@
       <span class="fi-count" id="evts-count"></span>
     </div>
     <div style="flex:1;overflow:auto;">
-      <table style="min-width:900px">
-        <thead><tr><th>Timestamp</th><th>Visitor ID</th><th>Merchant</th><th>Risk Score</th><th>IP Address</th><th>Risk Signals</th><th style="text-align:center">Visits</th></tr></thead>
+      <table style="min-width:1000px">
+        <thead><tr>
+          <th>Timestamp</th>
+          <th>Visitor ID</th>
+          <th>Merchant</th>
+          <th>Risk Score</th>
+          <th>IP Address</th>
+          <th>Signals</th>
+          <th style="text-align:center">Visits</th>
+        </tr></thead>
         <tbody id="events-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading events…</td></tr></tbody>
       </table>
     </div>
   </div>
 
-  <!-- ═══ IDENTITIES ═══ -->
+  <!-- === IDENTITIES === -->
   <div id="page-identities" class="page" style="padding:0;display:flex;flex-direction:column;">
     <div class="filter-bar">
       <input class="fi" type="text" id="idSearch" placeholder="Search visitor ID or IP…" oninput="applyIdFilter()" />
       <select class="fi" id="idRisk" onchange="applyIdFilter()">
         <option value="">All</option>
-        <option value="high">Flagged only</option>
+        <option value="high">Flagged Only</option>
       </select>
       <span class="fi-count" id="ids-count"></span>
     </div>
     <div style="flex:1;overflow:auto;">
-      <table style="min-width:850px">
-        <thead><tr><th>Visitor ID</th><th>Merchant</th><th>First Seen</th><th>Last Seen</th><th>Risk Score</th><th>Risk Signals</th><th style="text-align:center">Visits</th></tr></thead>
+      <table style="min-width:900px">
+        <thead><tr>
+          <th>Visitor ID</th>
+          <th>Merchant</th>
+          <th>First Seen</th>
+          <th>Last Seen</th>
+          <th>Risk Score</th>
+          <th>Signals</th>
+          <th style="text-align:center">Visits</th>
+        </tr></thead>
         <tbody id="identities-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading identities…</td></tr></tbody>
       </table>
     </div>
   </div>
 
-  <!-- ═══ DEVELOPERS ═══ -->
+  <!-- === DEVELOPERS === -->
   <div id="page-developers" class="page">
-    <div class="grid-2" style="margin-bottom:14px">
+    <div class="grid-2" style="margin-bottom:16px">
       <div class="panel">
         <div class="panel-head"><div class="panel-title">Active API Keys</div></div>
         <div class="tbl-wrap">
@@ -307,13 +367,13 @@
         </div>
       </div>
       <div class="panel">
-        <div class="panel-head"><div class="panel-title">Endpoints</div></div>
+        <div class="panel-head"><div class="panel-title">API Endpoints</div></div>
         <div class="panel-body" style="font-size:12px">
-          <div style="margin-bottom:10px">
-            <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Base URL</div>
-            <div class="mono" style="color:var(--brand)">https://api.arch-hayder.workers.dev</div>
+          <div style="margin-bottom:12px">
+            <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;font-weight:600">Base URL</div>
+            <div class="mono" style="color:var(--brand);font-size:12px">https://api.arch-hayder.workers.dev</div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;flex-direction:column;gap:8px">
             <div class="dr"><span class="mono"><span class="badge b-brand">POST</span> /v1/fingerprint</span><span style="color:var(--muted)">Identify device</span></div>
             <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /v1/dashboard</span><span style="color:var(--muted)">Portfolio overview</span></div>
             <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /v1/visitor/:id</span><span style="color:var(--muted)">Device profile</span></div>
@@ -327,13 +387,13 @@
       <div class="panel-head"><div class="panel-title">SDK Quick Start</div></div>
       <div class="panel-body">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:11px;color:var(--muted)">1. Add the SDK to your checkout page</span>
+          <span style="font-size:11px;color:var(--muted);font-weight:500">1. Add the SDK</span>
           <button class="copy-btn" onclick="copyEl('snip-script')">Copy</button>
         </div>
         <div class="code-block" id="snip-script">&lt;script src="https://deviceid-cdn.pages.dev/deviceid.min.js"&gt;&lt;/script&gt;</div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:11px;color:var(--muted)">2. Initialize and call identify() silently on page load</span>
+          <span style="font-size:11px;color:var(--muted);font-weight:500">2. Initialize &amp; identify</span>
           <button class="copy-btn" onclick="copyEl('snip-init')">Copy</button>
         </div>
         <div class="code-block" id="snip-init">const sdk = new DeviceID({
@@ -341,39 +401,63 @@
   endpoint: 'https://api.arch-hayder.workers.dev'
 });
 
-// Fire silently — no user interaction needed
-sdk.identify().then(result => {
-  // result.visitorId  — stable device ID
-  // result.riskScore  — 0-100
-  // result.isNew      — first-time visitor?
-  // result.riskSignals.vpn / .bot / .incognito
-  console.log(result);
+sdk.identify().then(result =&gt; {
+  console.log(result.visitorId);     // stable device ID
+  console.log(result.riskScore);     // 0-100
+  console.log(result.confidence);    // match certainty
+  console.log(result.signals);       // 22 signal breakdown
+  console.log(result.riskSignals);   // vpn, bot, incognito, headless
+  console.log(result.geo);           // country, city, ASN
 });</div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:11px;color:var(--muted)">3. Or call the API directly from your backend</span>
-          <button class="copy-btn" onclick="copyEl('snip-curl')">Copy</button>
+          <span style="font-size:11px;color:var(--muted);font-weight:500">3. API Response Format</span>
+          <button class="copy-btn" onclick="copyEl('snip-resp')">Copy</button>
         </div>
-        <div class="code-block" id="snip-curl">curl -X POST https://api.arch-hayder.workers.dev/v1/fingerprint \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: pk_live_YOUR_KEY" \
-  -d '{ "canvas": "...", "webgl": "..." }'</div>
+        <div class="code-block" id="snip-resp">{
+  "visitorId": "dvc_a1b2c3d4e5f6",
+  "isNew": false,
+  "confidence": 0.92,
+  "matchTier": "fuzzy",          // exact | fuzzy | new
+  "matchedSignals": ["canvas", "webgl", "fonts", "browser", "audio"],
+  "riskScore": 15,
+  "riskSignals": {
+    "vpn": false, "incognito": false, "headless": false,
+    "bot": false, "tampered": false, "multiAccount": false
+  },
+  "signals": {
+    "collected": 19,             // out of 22 total
+    "total": 19,
+    "hashes": { ... },           // individual SHA-256 per signal
+    "groups": {                  // 7 composite groups for matching
+      "canvas":   { "hash": "a1b2...", "signals": ["canvas"] },
+      "webgl":    { "hash": "c3d4...", "signals": ["webgl","webglRender"] },
+      "audio":    { "hash": "e5f6...", "signals": ["audio"] },
+      "screen":   { "hash": "g7h8...", "signals": ["screen","clientRects"] },
+      "fonts":    { "hash": "i9j0...", "signals": ["fonts","arabicFonts","emoji"] },
+      "browser":  { "hash": "k1l2...", "signals": ["intlProbe","cssSupports","codecs","voices"] },
+      "hardware": { "hash": "m3n4...", "signals": ["hardware","mathml","browser"] }
+    }
+  },
+  "ip": "203.0.113.1",
+  "geo": { "country": "IQ", "city": "Baghdad", "timezone": "Asia/Baghdad", "asOrganization": "..." },
+  "processingMs": 42,
+  "sdkVersion": "3.0.0"
+}</div>
       </div>
     </div>
   </div>
-</div><!-- .main -->
+</div>
 
-<!-- ══════════════════════════════════════════════════════
-     VISITOR SLIDE-OUT
-══════════════════════════════════════════════════════ -->
+<!-- ══ VISITOR SLIDE-OUT ══ -->
 <div class="overlay" id="overlay" onclick="closeSlideout()"></div>
 <div class="slideout" id="slideout">
   <div class="so-head">
     <div>
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Visitor Profile</div>
-      <div class="mono" id="so-vid" style="font-size:12px;color:var(--brand)">—</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:4px">Visitor Profile</div>
+      <div class="mono" id="so-vid" style="font-size:13px;color:var(--brand)">—</div>
     </div>
-    <button class="btn-x" onclick="closeSlideout()">×</button>
+    <button class="btn-x" onclick="closeSlideout()">&times;</button>
   </div>
   <div class="so-body" id="so-body">
     <div class="loading"><div class="spin"></div></div>
@@ -388,36 +472,49 @@ sdk.identify().then(result => {
   let uniqIdentities = [];
   let trendChart = null;
 
-  // ── Tab switching ────────────────────────────────────────
+  // ── Signal group definitions (mirrors Worker v3 grouping) ──
+  const SIGNAL_GROUPS = [
+    { key: 'canvas',   name: 'Canvas',   icon: 'render',  color: '#a855f7', signals: ['Canvas rendering'],                                         desc: 'Browser text & graphics rendering fingerprint' },
+    { key: 'webgl',    name: 'WebGL',    icon: 'gpu',     color: '#3b82f6', signals: ['WebGL params', 'Pixel render hash'],                         desc: 'GPU identity via shader pixel output' },
+    { key: 'audio',    name: 'Audio',    icon: 'audio',   color: '#ec4899', signals: ['Audio pipeline fingerprint'],                                desc: 'Audio processing differences' },
+    { key: 'screen',   name: 'Screen',   icon: 'display', color: '#06b6d4', signals: ['Screen dimensions', 'ClientRects / DOMRect'],                desc: 'Display geometry & element rendering' },
+    { key: 'fonts',    name: 'Fonts',    icon: 'type',    color: '#f59e0b', signals: ['System fonts', 'Arabic fonts', 'Emoji rendering'],           desc: 'Glyph environment with MENA-specific fonts' },
+    { key: 'browser',  name: 'Browser',  icon: 'browser', color: '#10b981', signals: ['Intl API probe', 'CSS.supports()', 'Media codecs', 'SpeechSynthesis voices'], desc: 'Deep platform probe (highest entropy)' },
+    { key: 'hardware', name: 'Hardware', icon: 'cpu',     color: '#818cf8', signals: ['Hardware specs', 'MathML rendering', 'Browser basics'],      desc: 'Platform & hardware identity' },
+  ];
+
+  // ── Volatile signals (not used for matching, used for analysis) ──
+  const VOLATILE_SIGNALS = [
+    { name: 'Timezone',       desc: 'IANA timezone, UTC offset, DST — used for VPN detection' },
+    { name: 'Permissions',    desc: 'Camera, microphone, notification states — used for risk scoring' },
+    { name: 'Storage Quota',  desc: 'Available storage — used for incognito detection' },
+  ];
+
+  // ── Tab switching ──
   function switchTab(name) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === name));
     document.querySelectorAll('.page').forEach(el => {
-      el.classList.toggle('active', el.id === 'page-' + name);
-      if (el.id === 'page-' + name) {
-        el.style.display = (name === 'events' || name === 'identities') ? 'flex' : 'block';
-      } else {
-        el.style.display = 'none';
-      }
+      const isTarget = el.id === 'page-' + name;
+      el.classList.toggle('active', isTarget);
+      if (isTarget) el.style.display = (name === 'events' || name === 'identities') ? 'flex' : 'block';
+      else el.style.display = 'none';
     });
     const titles = { overview: 'Overview', events: 'Event Logs', identities: 'Identities', developers: 'Developers' };
     document.getElementById('pageTitle').textContent = titles[name] || name;
     if (name === 'developers') loadDevelopers();
   }
 
-  // ── Data fetch ───────────────────────────────────────────
-  async function loadDashboard(manual) {
+  // ── Data fetch ──
+  async function loadDashboard() {
     try {
       const res = await fetch(`${API}/v1/dashboard`, { headers: { 'x-api-key': KEY } });
       data = await res.json();
       allEvents = data.allEvents || data.riskyEvents || [];
-
-      // Deduplicate into unique identities (latest record per visitor)
       const map = new Map();
       allEvents.forEach(e => { if (!map.has(e.visitorId)) map.set(e.visitorId, e); });
       uniqIdentities = [...map.values()];
 
-      // Badge
-      const hrCount = allEvents.filter(e => e.isVpn || e.isIncognito || (e.headlessScore||0) >= 40 || (e.botScore||0) >= 2).length;
+      const hrCount = allEvents.filter(e => isHighRisk(e)).length;
       const badge = document.getElementById('riskBadge');
       badge.textContent = hrCount;
       badge.classList.toggle('show', hrCount > 0);
@@ -427,44 +524,47 @@ sdk.identify().then(result => {
       renderIdentities();
       document.getElementById('lastRefresh').textContent =
         'Refreshed ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch(e) {
-      console.error(e);
-    }
+    } catch(e) { console.error(e); }
   }
 
-  // ── Overview ─────────────────────────────────────────────
+  // ── Overview ──
   function renderOverview() {
     if (!data) return;
     const ov = data.overview;
-    const hr = ov.events_24h > 0 ? ((ov.high_risk_24h / ov.events_24h) * 100).toFixed(1) : '0.0';
-    // Avg risk: compute directly from allEvents using the same formula as the Worker
+    const hrRate = ov.events_24h > 0 ? ((ov.high_risk_24h / ov.events_24h) * 100).toFixed(1) : '0.0';
     const avgRisk = allEvents.length
-      ? Math.round(allEvents.reduce((sum, e) => sum + calcRisk(e), 0) / allEvents.length)
+      ? Math.round(allEvents.reduce((s, e) => s + calcRisk(e), 0) / allEvents.length)
       : 0;
 
-    document.getElementById('kpi-events').textContent = ov.events_24h.toLocaleString();
-    document.getElementById('kpi-events-d').textContent = `${ov.new_devices_24h} new devices`;
-    document.getElementById('kpi-visitors').textContent = ov.unique_devices_24h.toLocaleString();
-    document.getElementById('kpi-conf').textContent = avgRisk + '%';
-    document.getElementById('kpi-conf').className = 'kpi-value ' + (avgRisk >= 40 ? 'c-danger' : avgRisk >= 20 ? 'c-warn' : 'c-ok');
-    document.getElementById('kpi-conf-d').textContent = avgRisk >= 40 ? 'Elevated — review events' : avgRisk >= 20 ? 'Moderate — monitor' : 'Low — portfolio healthy';
-    document.getElementById('kpi-risk').textContent = hr + '%';
-    document.getElementById('kpi-risk').className = 'kpi-value ' + (parseFloat(hr) >= 20 ? 'c-danger' : parseFloat(hr) >= 8 ? 'c-warn' : 'c-ok');
-    document.getElementById('kpi-risk-d').textContent = ov.high_risk_24h + ' flagged events';
+    setKpi('kpi-events', ov.events_24h.toLocaleString(), null);
+    document.getElementById('kpi-events-d').textContent = `Last 24 hours`;
+    setKpi('kpi-visitors', ov.unique_devices_24h.toLocaleString(), null);
+    document.getElementById('kpi-visitors-d').textContent = `${ov.new_devices_24h} new today`;
+    setKpi('kpi-new', ov.new_devices_24h.toLocaleString(), null);
+    setKpi('kpi-risk', hrRate + '%', parseFloat(hrRate) >= 15 ? 'danger' : parseFloat(hrRate) >= 5 ? 'warn' : 'ok');
+    document.getElementById('kpi-risk-d').textContent = `${ov.high_risk_24h} flagged events`;
+    setKpi('kpi-avgrisk', avgRisk, avgRisk >= 40 ? 'danger' : avgRisk >= 20 ? 'warn' : 'ok');
+    document.getElementById('kpi-avgrisk-d').textContent = avgRisk >= 40 ? 'Elevated' : avgRisk >= 20 ? 'Moderate' : 'Healthy';
 
     renderChart();
+    renderSignalCoverage();
     renderMerchants();
+  }
+
+  function setKpi(id, value, colorKey) {
+    const el = document.getElementById(id);
+    el.textContent = value;
+    if (colorKey) {
+      const colors = { ok: 'var(--ok)', warn: 'var(--warn)', danger: 'var(--danger)' };
+      el.style.color = colors[colorKey] || '';
+    }
   }
 
   function renderChart() {
     const hourly = data.hourly || [];
-    const labels = hourly.map(h => {
-      const d = new Date(h.hour);
-      return d.getHours().toString().padStart(2,'0') + ':00';
-    });
-    const trusted  = hourly.map(h => h.trusted  !== undefined ? h.trusted  : Math.max(0, (h.events||0) - (h.highRisk||0)));
+    const labels = hourly.map(h => new Date(h.hour).getHours().toString().padStart(2,'0') + ':00');
+    const trusted = hourly.map(h => h.trusted !== undefined ? h.trusted : Math.max(0, (h.events||0) - (h.highRisk||0)));
     const highRisk = hourly.map(h => h.highRisk !== undefined ? h.highRisk : 0);
-
     const ctx = document.getElementById('trendChart').getContext('2d');
     if (trendChart) trendChart.destroy();
     trendChart = new Chart(ctx, {
@@ -472,30 +572,63 @@ sdk.identify().then(result => {
       data: {
         labels,
         datasets: [
-          { label: 'Trusted',   data: trusted,  backgroundColor: 'rgba(16,185,129,0.45)', borderColor: 'rgba(16,185,129,0.7)', borderWidth: 1, borderRadius: 2, stack: 's' },
-          { label: 'High Risk', data: highRisk, backgroundColor: 'rgba(239,68,102,0.55)', borderColor: 'rgba(239,68,102,0.8)', borderWidth: 1, borderRadius: 2, stack: 's' },
+          { label: 'Trusted', data: trusted, backgroundColor: 'rgba(16,185,129,0.5)', borderColor: 'rgba(16,185,129,0.7)', borderWidth: 1, borderRadius: 3, stack: 's' },
+          { label: 'High Risk', data: highRisk, backgroundColor: 'rgba(239,68,68,0.5)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1, borderRadius: 3, stack: 's' },
         ],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'top', labels: { color: '#4f6678', font: { size: 11, family: 'Inter' }, boxWidth: 10, padding: 12 } },
-          tooltip: { backgroundColor: '#0b1520', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, titleColor: '#d9e8f5', bodyColor: '#4f6678', padding: 10 },
+          legend: { position: 'top', labels: { color: '#64748b', font: { size: 11, family: 'Inter' }, boxWidth: 10, padding: 14 } },
+          tooltip: { backgroundColor: '#0f1219', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10 },
         },
         scales: {
-          x: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4f6678', font: { size: 10 } } },
-          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4f6678', font: { size: 10 }, precision: 0 } },
+          x: { stacked: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 }, precision: 0 } },
         },
       },
     });
   }
 
+  function renderSignalCoverage() {
+    // Show the 7 signal groups + 3 volatile analysis signals
+    const html = `
+      <div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:600;color:var(--text-2)">Matching Groups</span>
+          <span style="font-size:10px;color:var(--muted)">7 groups &middot; 19 signals</span>
+        </div>
+        ${SIGNAL_GROUPS.map(g => `
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <div style="width:8px;height:8px;border-radius:2px;background:${g.color};flex-shrink:0"></div>
+            <span style="font-size:11px;font-weight:600;flex:1">${g.name}</span>
+            <span style="font-size:10px;color:var(--muted)">${g.signals.length} signal${g.signals.length > 1 ? 's' : ''}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:600;color:var(--text-2)">Analysis-Only Signals</span>
+          <span style="font-size:10px;color:var(--muted)">3 volatile</span>
+        </div>
+        ${VOLATILE_SIGNALS.map(s => `
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <div style="width:8px;height:8px;border-radius:2px;background:var(--muted);flex-shrink:0;opacity:0.5"></div>
+            <span style="font-size:11px;flex:1">${s.name}</span>
+            <span style="font-size:10px;color:var(--muted)" title="${esc(s.desc)}">analysis</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    document.getElementById('signal-coverage-body').innerHTML = html;
+  }
+
   function renderMerchants() {
     const merchants = data.merchants || [];
-    document.getElementById('merchant-count').textContent = merchants.length + ' merchants';
+    document.getElementById('merchant-count').textContent = merchants.length + ' active';
     document.getElementById('merchants-tbody').innerHTML = merchants.map(m => {
       const rr = m.events24h > 0 ? ((m.highRisk24h / m.events24h) * 100).toFixed(1) : '0.0';
-      const cls = parseFloat(rr) >= 20 ? 'c-danger' : parseFloat(rr) >= 8 ? 'c-warn' : 'c-ok';
+      const cls = parseFloat(rr) >= 15 ? 'c-danger' : parseFloat(rr) >= 5 ? 'c-warn' : 'c-ok';
       return `<tr>
         <td style="font-weight:600">${esc(m.name)}</td>
         <td><span class="mono">${esc(m.publicKey)}</span></td>
@@ -506,7 +639,7 @@ sdk.identify().then(result => {
       </tr>`;
     }).join('') || '<tr><td colspan="6" class="loading">No merchant data</td></tr>';
 
-    // Populate merchant filter dropdown
+    // Populate merchant filter
     const sel = document.getElementById('evtMerchant');
     const cur = sel.value;
     while (sel.options.length > 1) sel.remove(1);
@@ -519,7 +652,7 @@ sdk.identify().then(result => {
     sel.value = cur;
   }
 
-  // ── Events ───────────────────────────────────────────────
+  // ── Events ──
   function applyFilter() {
     const s = document.getElementById('evtSearch').value.toLowerCase();
     const m = document.getElementById('evtMerchant').value;
@@ -527,40 +660,37 @@ sdk.identify().then(result => {
     let evs = allEvents;
     if (s) evs = evs.filter(e => (e.visitorId||'').toLowerCase().includes(s) || (e.ipAddress||'').includes(s) || (e.merchantName||'').toLowerCase().includes(s));
     if (m) evs = evs.filter(e => e.publicKey === m);
-    if (r === 'high') evs = evs.filter(e => e.isVpn || e.isIncognito || (e.headlessScore||0) >= 40 || (e.botScore||0) >= 2);
-    if (r === 'clean') evs = evs.filter(e => !e.isVpn && !e.isIncognito && (e.headlessScore||0) < 40 && (e.botScore||0) < 2);
+    if (r === 'high') evs = evs.filter(e => isHighRisk(e));
+    if (r === 'clean') evs = evs.filter(e => !isHighRisk(e));
     renderEventsRows(evs);
   }
-
   function renderEvents() { applyFilter(); }
 
   function renderEventsRows(evs) {
     document.getElementById('evts-count').textContent = evs.length + ' events';
     document.getElementById('events-tbody').innerHTML = evs.map(e => {
       const risk = calcRisk(e);
-      const ts = fmtDate(e.lastSeen);
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
-        <td class="mono" style="color:var(--muted)">${ts}</td>
+        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.lastSeen)}</td>
         <td><span class="mono" style="color:var(--brand)">${esc((e.visitorId||'').substring(0,20))}…</span></td>
         <td>${esc(e.merchantName||'—')}</td>
-        <td>${confPill(risk)}</td>
-        <td class="mono">${esc(e.ipAddress||'—')}</td>
+        <td>${riskPill(risk)}</td>
+        <td class="mono" style="font-size:11px">${esc(e.ipAddress||'—')}</td>
         <td><div class="sigs">${sigBadges(e)}</div></td>
         <td style="text-align:center"><span class="badge b-muted">${e.visitCount||1}</span></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="7" class="loading">No events match filter</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="loading">No events match</td></tr>';
   }
 
-  // ── Identities ───────────────────────────────────────────
+  // ── Identities ──
   function applyIdFilter() {
     const s = document.getElementById('idSearch').value.toLowerCase();
     const r = document.getElementById('idRisk').value;
     let ids = uniqIdentities;
     if (s) ids = ids.filter(e => (e.visitorId||'').toLowerCase().includes(s) || (e.ipAddress||'').includes(s));
-    if (r === 'high') ids = ids.filter(e => e.isVpn || e.isIncognito || (e.headlessScore||0) >= 40 || (e.botScore||0) >= 2);
+    if (r === 'high') ids = ids.filter(e => isHighRisk(e));
     renderIdentitiesRows(ids);
   }
-
   function renderIdentities() { applyIdFilter(); }
 
   function renderIdentitiesRows(ids) {
@@ -570,16 +700,16 @@ sdk.identify().then(result => {
       return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
         <td><span class="mono" style="color:var(--brand)">${esc(e.visitorId||'—')}</span></td>
         <td>${esc(e.merchantName||'—')}</td>
-        <td class="mono" style="color:var(--muted)">${fmtDate(e.firstSeen||e.lastSeen)}</td>
-        <td class="mono" style="color:var(--muted)">${fmtDate(e.lastSeen)}</td>
-        <td>${confPill(risk)}</td>
+        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.firstSeen||e.lastSeen)}</td>
+        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.lastSeen)}</td>
+        <td>${riskPill(risk)}</td>
         <td><div class="sigs">${sigBadges(e)}</div></td>
         <td style="text-align:center"><span class="badge b-brand">${e.visitCount||1}</span></td>
       </tr>`;
     }).join('') || '<tr><td colspan="7" class="loading">No identities found</td></tr>';
   }
 
-  // ── Developers ───────────────────────────────────────────
+  // ── Developers ──
   async function loadDevelopers() {
     try {
       const res = await fetch(`${API}/stats`, { headers: { 'x-api-key': KEY } });
@@ -594,7 +724,7 @@ sdk.identify().then(result => {
     } catch(e) {}
   }
 
-  // ── Visitor slide-out ─────────────────────────────────────
+  // ── Visitor slide-out ──
   async function openVisitor(visitorId) {
     document.getElementById('so-vid').textContent = visitorId;
     document.getElementById('so-body').innerHTML = '<div class="loading"><div class="spin"></div></div>';
@@ -608,86 +738,128 @@ sdk.identify().then(result => {
       renderVisitorDetail(v);
     } catch(e) {
       const local = allEvents.find(ev => ev.visitorId === visitorId);
-      if (local) renderVisitorDetailFallback(local);
+      if (local) renderVisitorFallback(local);
       else document.getElementById('so-body').innerHTML = '<div class="loading">Could not load visitor profile.</div>';
     }
   }
 
   function renderVisitorDetail(v) {
-    const conf = calcRisk({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore, visitCount: v.visitCount });
-    const hashes = v.hashes || {};
-    const hashItems = [
-      { label: 'Canvas',   val: hashes.canvas   },
-      { label: 'WebGL',    val: hashes.webgl     },
-      { label: 'Audio',    val: hashes.audio     },
-      { label: 'Screen',   val: hashes.screen    },
-      { label: 'Fonts',    val: hashes.fonts     },
-      { label: 'Browser',  val: hashes.browser   },
-      { label: 'Hardware', val: hashes.hardware  },
-    ].filter(h => h.val);
-
-    const linked = (v.linkedDevices || []);
-    const linkedHtml = linked.length
-      ? linked.map(l => `<div class="dr">
-          <span class="mono" style="color:var(--brand)">${esc((l.linkedId||'').substring(0,22))}…</span>
-          <div style="display:flex;gap:5px">
-            <span class="badge b-muted">${esc(l.linkType||'linked')}</span>
-            ${confPill(Math.round((l.confidence||0)*100))}
-          </div>
-        </div>`).join('')
-      : '<div style="color:var(--muted);font-size:12px;padding:6px 0">No linked devices recorded</div>';
+    const risk = calcRisk({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore, visitCount: v.visitCount });
+    const groups = v.signalGroups || [];
+    const linked = v.linkedDevices || [];
 
     document.getElementById('so-body').innerHTML = `
+      <!-- Risk Assessment -->
       <div class="so-sec">
         <div class="so-sec-title">Risk Assessment</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          ${confPill(conf, true)}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          ${riskPill(risk, true)}
           <div class="sigs">${sigBadges({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore })}</div>
         </div>
         <div class="dr"><span class="dk">IP Address</span><span class="dv">${esc(v.ipAddress||'—')}</span></div>
-        <div class="dr"><span class="dk">VPN</span><span>${v.isVpn ? '<span class="badge b-danger">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
-        <div class="dr"><span class="dk">Private Mode</span><span>${v.isIncognito ? '<span class="badge b-warn">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
-        <div class="dr"><span class="dk">Headless Score</span><span class="dv">${v.headlessScore||0}%</span></div>
-        <div class="dr"><span class="dk">Bot Score</span><span class="dv">${v.botScore||0}</span></div>
+        <div class="dr"><span class="dk">VPN / Proxy</span><span>${v.isVpn ? '<span class="badge b-danger">Detected</span>' : '<span class="badge b-ok">None</span>'}</span></div>
+        <div class="dr"><span class="dk">Incognito</span><span>${v.isIncognito ? '<span class="badge b-warn">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
+        <div class="dr"><span class="dk">Headless Score</span><span class="dv">${v.headlessScore || 0}%</span></div>
+        <div class="dr"><span class="dk">Bot Signals</span><span class="dv">${v.botScore || 0} detected</span></div>
       </div>
+
+      <!-- Signal Groups (22 signals in 7 groups) -->
+      <div class="so-sec">
+        <div class="so-sec-title">
+          Signal Groups
+          <span class="so-sec-count">${groups.length} groups &middot; 22 signals</span>
+        </div>
+        ${groups.length > 0 ? groups.map(g => {
+          const def = SIGNAL_GROUPS.find(d => d.key === g.name.toLowerCase()) || {};
+          return `
+          <div class="sg-card">
+            <div class="sg-head">
+              <div class="sg-icon ${def.icon || 'cpu'}">${sgIconSvg(def.icon || 'cpu')}</div>
+              <div class="sg-name">${esc(g.name)}</div>
+              <div class="sg-hash" title="${esc(g.hash || '')}">${g.hash ? g.hash.substring(0, 16) + '…' : '—'}</div>
+            </div>
+            <div class="sg-signals">
+              ${(g.signals || []).map(s => `<div class="sg-sig active">${esc(s)}</div>`).join('')}
+            </div>
+          </div>`;
+        }).join('') : `
+          ${SIGNAL_GROUPS.map(g => `
+          <div class="sg-card">
+            <div class="sg-head">
+              <div class="sg-icon ${g.icon}">${sgIconSvg(g.icon)}</div>
+              <div class="sg-name">${g.name}</div>
+              <div style="font-size:10px;color:var(--muted)">—</div>
+            </div>
+            <div class="sg-signals">
+              ${g.signals.map(s => `<div class="sg-sig">${esc(s)}</div>`).join('')}
+            </div>
+          </div>`).join('')}
+        `}
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em">Analysis-Only (volatile)</div>
+          ${VOLATILE_SIGNALS.map(s => `
+            <div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;color:var(--text-2)">
+              <div style="width:4px;height:4px;border-radius:50%;background:var(--muted);opacity:0.5;flex-shrink:0"></div>
+              ${s.name} <span style="color:var(--muted);font-size:10px;margin-left:auto">${s.desc.split('—')[0].trim()}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Visit History -->
       <div class="so-sec">
         <div class="so-sec-title">Visit History</div>
         <div class="dr"><span class="dk">First Seen</span><span class="dv">${v.firstSeen ? new Date(v.firstSeen).toLocaleString() : '—'}</span></div>
         <div class="dr"><span class="dk">Last Seen</span><span class="dv">${v.lastSeen ? new Date(v.lastSeen).toLocaleString() : '—'}</span></div>
-        <div class="dr"><span class="dk">Total Visits</span><span class="dv">${v.visitCount||'—'}</span></div>
-        <div class="dr"><span class="dk">Merchant</span><span class="dv">${esc(v.merchantName||'—')}</span></div>
+        <div class="dr"><span class="dk">Total Visits</span><span class="dv">${v.visitCount || '—'}</span></div>
+        <div class="dr"><span class="dk">Merchant</span><span class="dv">${esc(v.merchantName || '—')}</span></div>
       </div>
+
+      <!-- Linked Devices -->
       <div class="so-sec">
-        <div class="so-sec-title">Fingerprint Signals (${hashItems.length} groups)</div>
-        ${hashItems.map(h => `<div class="hash-row">
-          <span class="hash-lbl">${esc(h.label)}</span>
-          <span class="hash-val" title="${esc(h.val)}">${h.val.substring(0,30)}…</span>
-        </div>`).join('') || '<div style="color:var(--muted);font-size:12px">No hash data available</div>'}
+        <div class="so-sec-title">Identity Graph <span class="so-sec-count">${linked.length} linked</span></div>
+        ${linked.length > 0 ? linked.map(l => `
+          <div class="dr">
+            <span class="mono" style="color:var(--brand);font-size:11px">${esc((l.linkedId||'').substring(0,22))}…</span>
+            <div style="display:flex;gap:5px">
+              <span class="badge b-muted">${esc(l.linkType||'linked')}</span>
+              ${riskPill(Math.round((l.confidence||0)*100))}
+            </div>
+          </div>`).join('') : '<div style="color:var(--muted);font-size:12px;padding:4px 0">No linked devices recorded</div>'}
       </div>
-      <div class="so-sec">
-        <div class="so-sec-title">Identity Graph · Linked Devices (${linked.length})</div>
-        ${linkedHtml}
-      </div>`;
+    `;
   }
 
-  function renderVisitorDetailFallback(e) {
-    const conf = calcRisk(e);
+  function renderVisitorFallback(e) {
+    const risk = calcRisk(e);
     document.getElementById('so-body').innerHTML = `
       <div class="so-sec">
         <div class="so-sec-title">Risk Assessment</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          ${confPill(conf, true)}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          ${riskPill(risk, true)}
           <div class="sigs">${sigBadges(e)}</div>
         </div>
-        <div class="dr"><span class="dk">IP</span><span class="dv">${esc(e.ipAddress||'—')}</span></div>
-        <div class="dr"><span class="dk">VPN</span><span>${e.isVpn ? '<span class="badge b-danger">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
+        <div class="dr"><span class="dk">IP Address</span><span class="dv">${esc(e.ipAddress||'—')}</span></div>
+        <div class="dr"><span class="dk">VPN</span><span>${e.isVpn ? '<span class="badge b-danger">Detected</span>' : '<span class="badge b-ok">None</span>'}</span></div>
         <div class="dr"><span class="dk">Incognito</span><span>${e.isIncognito ? '<span class="badge b-warn">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
         <div class="dr"><span class="dk">Last Seen</span><span class="dv">${new Date(e.lastSeen).toLocaleString()}</span></div>
         <div class="dr"><span class="dk">Visits</span><span class="dv">${e.visitCount||1}</span></div>
       </div>
       <div class="so-sec">
-        <div style="color:var(--muted);font-size:12px">Detailed fingerprint data available after deploying /v1/visitor/:id Worker endpoint.</div>
-      </div>`;
+        <div class="so-sec-title">Signal Groups <span class="so-sec-count">22 signals</span></div>
+        ${SIGNAL_GROUPS.map(g => `
+        <div class="sg-card">
+          <div class="sg-head">
+            <div class="sg-icon ${g.icon}">${sgIconSvg(g.icon)}</div>
+            <div class="sg-name">${g.name}</div>
+            <span style="font-size:10px;color:var(--muted)">${g.signals.length} signals</span>
+          </div>
+          <div class="sg-signals">
+            ${g.signals.map(s => `<div class="sg-sig">${esc(s)}</div>`).join('')}
+          </div>
+        </div>`).join('')}
+      </div>
+    `;
   }
 
   function closeSlideout() {
@@ -695,25 +867,39 @@ sdk.identify().then(result => {
     document.getElementById('slideout').classList.remove('open');
   }
 
-  // ── Helpers ──────────────────────────────────────────────
-  // calcRisk mirrors the Worker's riskScore formula exactly (0-100)
+  // ── Signal group icons ──
+  function sgIconSvg(type) {
+    const icons = {
+      render:  '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v12H2z" opacity=".3"/><path d="M4 6l4-3 4 3v6H4z"/></svg>',
+      gpu:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="4" width="12" height="8" rx="1"/><path d="M5 1v3M8 1v3M11 1v3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>',
+      audio:   '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v14M5 4v8M2 6v4M11 4v8M14 6v4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>',
+      display: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 14h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+      type:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v2H9v8H7V5H3z"/></svg>',
+      browser: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12" fill="none" stroke="currentColor" stroke-width="1"/></svg>',
+      cpu:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 1v3M10 1v3M6 12v3M10 12v3M1 6h3M1 10h3M12 6h3M12 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>',
+    };
+    return icons[type] || icons.cpu;
+  }
+
+  // ── Helpers ──
+  function isHighRisk(e) {
+    return e.isVpn || e.isIncognito || (e.headlessScore||0) >= 40 || (e.botScore||0) >= 2;
+  }
+
   function calcRisk(e) {
     let s = 0;
-    if (!e.visitCount || e.visitCount <= 1) s += 15;  // new device
+    if (!e.visitCount || e.visitCount <= 1) s += 15;
     if (e.isVpn)                             s += 25;
     if (e.isIncognito)                       s += 20;
     if ((e.headlessScore||0) >= 40)          s += 30;
     if ((e.botScore||0) >= 2)                s += 35;
     return Math.min(100, Math.max(0, s));
   }
-  // Keep alias so slide-out fallback still works
-  function calcConf(e) { return calcRisk(e); }
 
-  // Risk pill: 0=green (clean), 40+=red (high risk)
-  function confPill(pct, large) {
-    const cls = pct >= 40 ? 'cp-lo' : pct >= 20 ? 'cp-md' : 'cp-hi';
-    const style = large ? 'font-size:15px;padding:4px 12px' : '';
-    return `<span class="cpill ${cls}" style="${style}">${pct}%</span>`;
+  function riskPill(score, large) {
+    const cls = score >= 40 ? 'rp-high' : score >= 20 ? 'rp-med' : 'rp-low';
+    const style = large ? 'font-size:15px;padding:5px 14px' : '';
+    return `<span class="rpill ${cls}" style="${style}">${score}</span>`;
   }
 
   function sigBadges(e) {
@@ -737,11 +923,10 @@ sdk.identify().then(result => {
   }
 
   function copyEl(id) {
-    const t = document.getElementById(id).textContent;
-    navigator.clipboard.writeText(t).catch(() => {});
+    navigator.clipboard.writeText(document.getElementById(id).textContent).catch(() => {});
   }
 
-  // ── Boot ─────────────────────────────────────────────────
+  // ── Boot ──
   loadDashboard();
   setInterval(loadDashboard, 30000);
 </script>
