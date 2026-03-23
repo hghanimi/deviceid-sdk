@@ -144,7 +144,7 @@ app.post('/v1/fingerprint', async (c) => {
           clientIp,
           (signals.evasion?.webrtcIPs?.length || 0) > 0,
           signals.evasion?.isPrivate || false,
-          signals.evasion?.headlessScore || 0,
+          Math.round((signals.evasion?.headlessScore || 0) * 100),
           Object.values(signals.evasion?.bot || {}).filter(Boolean).length,
           apiKeyId,
         ]
