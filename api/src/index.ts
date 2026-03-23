@@ -33,6 +33,16 @@ app.use('*', cors());
 app.use('*', async (c, next) => {
   const client = new Client({ connectionString: c.env.DATABASE_URL });
   await client.connect();
+  // Auto-migrate: add device-level hash columns if missing
+  try {
+    await client.query(`
+      ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS device_hash TEXT;
+      ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS screen_only_hash TEXT;
+      ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS gpu_hash TEXT;
+      ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS hw_only_hash TEXT;
+      ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS fonts_only_hash TEXT;
+    `);
+  } catch (e) { /* columns already exist or non-fatal */ }
   c.set('db', client);
   await next();
   await client.end();
@@ -387,7 +397,7 @@ app.post('/v1/fingerprint', async (c) => {
     };
 
     // Build stable composite — exclude volatile/session-specific fields
-    const { storedIds, ts, collectionMs, v, evasion, ...stableCore } = signals;
+    const { storedIds, ts, collectionMs, v, evasion, rawAttributes, ...stableCore } = signals;
 
     const legacyHashes = {
       composite: h(stableCore),
@@ -400,25 +410,55 @@ app.post('/v1/fingerprint', async (c) => {
       hardware:  h(signals.hardware),
     };
 
+    // ─── DEVICE-LEVEL HASH: signals that are IDENTICAL across all browsers on the same device ───
+    // This is the key insight: hardware, screen resolution, installed fonts, and GPU name
+    // don't change when you switch from Chrome to Firefox to Edge.
+    const hw = signals.hardware || {};
+    const scr = signals.screen || {};
+    const wgl = signals.webgl || {};
+    const deviceStableSignals = {
+      cores: hw.cores || 0,
+      mem: hw.mem || 0,
+      platform: hw.platform || '',
+      screenW: scr.w || scr.width || 0,
+      screenH: scr.h || scr.height || 0,
+      colorDepth: scr.colorDepth || scr.cd || 0,
+      dpr: scr.dpr || scr.devicePixelRatio || 0,
+      gpu: (wgl.renderer || wgl.rendererUnmasked || '').replace(/\s+/g, ' ').trim(),
+      gpuVendor: (wgl.vendorUnmasked || wgl.vendor || '').replace(/\s+/g, ' ').trim(),
+      touch: hw.touch || 0,
+    };
+    // Font list is ~95% stable across browsers on same OS install
+    const fontList = Array.isArray(signals.fonts) ? signals.fonts :
+      (signals.fonts?.installed || signals.fonts?.detected || []);
+    const sortedFonts = (Array.isArray(fontList) ? [...fontList] : []).sort().join('|');
+    const deviceHash = h({ ...deviceStableSignals, fonts: sortedFonts });
+
     // v3 optimized grouped hashes — volatile signals (storageQuota, permissions, timezone)
     // excluded from matching hashes to prevent unnecessary mismatches.
     // Each group pairs signals with similar stability and entropy.
     const hashes = {
       composite: legacyHashes.composite,
-      canvas: h(signals.canvas),                                                    // rendering fingerprint
-      webgl: h({ webgl: signals.webgl, webglRender: signals.webglRender }),          // GPU identity (pixel-level)
-      audio: h(signals.audio),                                                       // audio pipeline
-      screen: h({ screen: signals.screen, clientRects: signals.clientRects }),        // display geometry
-      fonts: h({                                                                     // glyph environment
+      device: deviceHash,  // NEW: cross-browser device identity
+      canvas: h(signals.canvas),
+      webgl: h({ webgl: signals.webgl, webglRender: signals.webglRender }),
+      audio: h(signals.audio),
+      screen: h({ screen: signals.screen, clientRects: signals.clientRects }),
+      fonts: h({
         fonts: signals.fonts, arabicFonts: signals.arabicFonts, emoji: signals.emoji,
       }),
-      browser: h({                                                                   // deep platform probe (HIGH ENTROPY)
+      browser: h({
         intlProbe: signals.intlProbe, cssSupports: signals.cssSupports,
         codecs: signals.codecs, voices: signals.voices,
       }),
-      hardware: h({                                                                  // basic platform identity
+      hardware: h({
         hardware: signals.hardware, mathml: signals.mathml, browser: signals.browser,
       }),
+      // NEW: partial device hashes for graduated matching
+      screenOnly: h({ w: scr.w || scr.width, h: scr.h || scr.height, cd: scr.colorDepth || scr.cd, dpr: scr.dpr || scr.devicePixelRatio }),
+      gpuOnly: h({ gpu: deviceStableSignals.gpu, vendor: deviceStableSignals.gpuVendor }),
+      hwOnly: h({ cores: deviceStableSignals.cores, mem: deviceStableSignals.mem, platform: deviceStableSignals.platform, touch: deviceStableSignals.touch }),
+      fontsOnly: h(sortedFonts),
     };
 
     // Individual signal hashes for all 22 signals — returned in API response for transparency
@@ -580,11 +620,13 @@ app.post('/v1/fingerprint', async (c) => {
         `INSERT INTO fingerprints
           (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
            screen_hash, font_hash, browser_hash, hardware_hash,
+           device_hash, screen_only_hash, gpu_hash, hw_only_hash, fonts_only_hash,
            ip_address, country, first_seen, last_seen, visit_count,
            is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW(),1,$12,$13,$14,$15,$16)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW(),1,$17,$18,$19,$20,$21)`,
         [vid, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
          hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
+         hashes.device, hashes.screenOnly, hashes.gpuOnly, hashes.hwOnly, hashes.fontsOnly,
          clientIp, cfData.country || null,
          isVpn, evasion?.isPrivate || false, headlessScoreInt, botCount,
          apiKeyId]
@@ -683,9 +725,12 @@ app.post('/v1/fingerprint', async (c) => {
 
       } else {
         // ─── Tier 2: Weighted fuzzy match ─────────────
+        // TWO-PHASE approach: Phase A checks device-stable signals (cross-browser),
+        // Phase B checks browser-specific signals (same-browser precision).
         const candidates = await db.query(
           `SELECT visitor_id, ip_address, canvas_hash, webgl_hash, audio_hash,
-                  screen_hash, font_hash, browser_hash, hardware_hash
+                  screen_hash, font_hash, browser_hash, hardware_hash,
+                  device_hash, screen_only_hash, gpu_hash, hw_only_hash, fonts_only_hash
            FROM fingerprints
            WHERE api_key_id = $1
            ORDER BY last_seen DESC
@@ -693,15 +738,26 @@ app.post('/v1/fingerprint', async (c) => {
           [apiKeyId]
         );
 
-        const weights: Record<string, number> = {
-          browser:  0.20,
-          webgl:    0.16,
-          fonts:    0.16,
-          canvas:   0.14,
-          screen:   0.12,
-          hardware: 0.12,
-          audio:    0.10,
+        // ── Phase A: Device-level matching (cross-browser) ──
+        // These signals are IDENTICAL across Chrome, Firefox, Edge on the same device.
+        // device_hash alone is a very strong match (cores+mem+screen+gpu+fonts).
+        const deviceWeights: Record<string, number> = {
+          device:    0.35,   // full device identity (hw+screen+gpu+fonts)
+          screenOnly: 0.15,  // screen resolution + colorDepth + dpr
+          gpuOnly:   0.15,   // GPU renderer + vendor string
+          hwOnly:    0.15,   // CPU cores + memory + platform + touch
+          fontsOnly: 0.10,   // sorted installed font list
+          // Browser-level hashes (lower weight — only match same browser)
+          canvas:    0.04,
+          audio:     0.03,
+          browser:   0.03,
         };
+
+        // Sentinel: hash of empty/undefined data — must never be treated as a real match
+        const EMPTY_HASH = h({});
+        const EMPTY_NULL_HASH = h(null);
+        const EMPTY_UNDEF_HASH = h(undefined);
+        const emptySentinels = new Set([EMPTY_HASH, EMPTY_NULL_HASH, EMPTY_UNDEF_HASH]);
 
         let bestScore = 0;
         let bestCandidate: any = null;
@@ -709,35 +765,56 @@ app.post('/v1/fingerprint', async (c) => {
 
         for (const cand of candidates.rows) {
           let score = 0;
-          let total = 0;
+          // ALWAYS use the full sum of all weights as denominator.
+          // This prevents score inflation when most columns are NULL (old rows).
+          const totalWeight = Object.values(deviceWeights).reduce((a, b) => a + b, 0);
           const matched: string[] = [];
 
-          const pairs = [
-            { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
-            { key: 'webgl',    values: [hashes.webgl, legacyHashes.webgl],     stored: cand.webgl_hash },
-            { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
-            { key: 'screen',   values: [hashes.screen, legacyHashes.screen],   stored: cand.screen_hash },
-            { key: 'hardware', values: [hashes.hardware, legacyHashes.hardware],stored: cand.hardware_hash },
-            { key: 'fonts',    values: [hashes.fonts, legacyHashes.fonts],     stored: cand.font_hash },
-            { key: 'browser',  values: [hashes.browser, legacyHashes.browser], stored: cand.browser_hash },
+          // Device-stable hash comparisons
+          const devicePairs = [
+            { key: 'device',    incoming: hashes.device,     stored: cand.device_hash },
+            { key: 'screenOnly', incoming: hashes.screenOnly, stored: cand.screen_only_hash },
+            { key: 'gpuOnly',   incoming: hashes.gpuOnly,    stored: cand.gpu_hash },
+            { key: 'hwOnly',    incoming: hashes.hwOnly,     stored: cand.hw_only_hash },
+            { key: 'fontsOnly', incoming: hashes.fontsOnly,  stored: cand.fonts_only_hash },
           ];
 
-          for (const { key, values, stored } of pairs) {
-            if (!stored) continue;
-            const incoming = values.filter(Boolean);
-            if (incoming.length === 0) continue;
-            total += weights[key];
-            if (incoming.includes(stored)) {
-              score += weights[key];
+          for (const { key, incoming, stored } of devicePairs) {
+            if (!stored || !incoming) continue;
+            if (emptySentinels.has(stored) || emptySentinels.has(incoming)) continue;
+            if (incoming === stored) {
+              score += deviceWeights[key];
               matched.push(key);
             }
           }
 
-          const highEntropyMatches = ['canvas', 'webgl', 'fonts', 'browser'].filter((k) => matched.includes(k)).length;
-          if (highEntropyMatches >= 3) score += 0.08;
-          if (highEntropyMatches >= 2 && normalizeIp(cand.ip_address) === normalizedClientIp) score += 0.04;
+          // Browser-specific hash comparisons (legacy — only match same browser)
+          const browserPairs = [
+            { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
+            { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
+            { key: 'browser',  values: [hashes.browser, legacyHashes.browser], stored: cand.browser_hash },
+          ];
 
-          const normalized = total > 0 ? score / total : 0;
+          for (const { key, values, stored } of browserPairs) {
+            if (!stored) continue;
+            if (emptySentinels.has(stored)) continue;
+            const incoming = values.filter(v => v && !emptySentinels.has(v));
+            if (incoming.length === 0) continue;
+            if (incoming.includes(stored)) {
+              score += deviceWeights[key];
+              matched.push(key);
+            }
+          }
+
+          // Bonus: if device_hash matches, that's near-certain same device
+          if (matched.includes('device')) score += 0.10;
+          // Bonus: if 3+ device-stable signals match but not the full device hash
+          const stableMatches = ['screenOnly', 'gpuOnly', 'hwOnly', 'fontsOnly'].filter(k => matched.includes(k)).length;
+          if (stableMatches >= 3) score += 0.08;
+          // Bonus: same IP adds confidence
+          if (normalizeIp(cand.ip_address) === normalizedClientIp && matched.length >= 1) score += 0.05;
+
+          const normalized = score / totalWeight;
           if (normalized > bestScore) {
             bestScore = normalized;
             bestCandidate = cand;
@@ -745,7 +822,8 @@ app.post('/v1/fingerprint', async (c) => {
           }
         }
 
-        const MATCH_THRESHOLD = 0.58;
+        // Tier 2 threshold: device_hash match alone (0.35 + 0.10 bonus) easily clears this
+        const MATCH_THRESHOLD = 0.45;
 
         if (bestCandidate && bestScore >= MATCH_THRESHOLD) {
           visitorId = bestCandidate.visitor_id;
@@ -758,51 +836,41 @@ app.post('/v1/fingerprint', async (c) => {
           await insertAlias(visitorId);
 
         // ─── Tier 3: Cross-device network linking ─────
-        // Same IP + at least 2 matching signal groups = likely same household/person.
+        // Different physical device but same network, OR partial device signal overlap.
         // Creates a NEW visitor_id but LINKS it to the existing one.
-        // This catches: dad's phone, son's phone, same WiFi.
+        // This catches: phone + desktop on same WiFi, different household devices.
         } else {
-          // Also check partial fuzzy matches (below threshold) for cross-device links
-          const LINK_THRESHOLD = 0.30;
+          const LINK_THRESHOLD = 0.20;
           let linkCandidate: any = null;
           let linkScore = 0;
           let linkMatched: string[] = [];
 
-          // Re-evaluate best candidate at lower threshold, prioritizing same-IP peers
           for (const cand of candidates.rows) {
             const sameIp = normalizeIp(cand.ip_address) === normalizedClientIp;
-            let score = 0;
-            let total = 0;
             const matched: string[] = [];
 
-            const pairs = [
-              { key: 'canvas',   values: [hashes.canvas, legacyHashes.canvas],   stored: cand.canvas_hash },
-              { key: 'webgl',    values: [hashes.webgl, legacyHashes.webgl],     stored: cand.webgl_hash },
-              { key: 'audio',    values: [hashes.audio, legacyHashes.audio],     stored: cand.audio_hash },
-              { key: 'screen',   values: [hashes.screen, legacyHashes.screen],   stored: cand.screen_hash },
-              { key: 'hardware', values: [hashes.hardware, legacyHashes.hardware],stored: cand.hardware_hash },
-              { key: 'fonts',    values: [hashes.fonts, legacyHashes.fonts],     stored: cand.font_hash },
-              { key: 'browser',  values: [hashes.browser, legacyHashes.browser], stored: cand.browser_hash },
+            // Check device-stable signals
+            const stablePairs = [
+              { key: 'screenOnly', incoming: hashes.screenOnly, stored: cand.screen_only_hash },
+              { key: 'gpuOnly',   incoming: hashes.gpuOnly,    stored: cand.gpu_hash },
+              { key: 'hwOnly',    incoming: hashes.hwOnly,     stored: cand.hw_only_hash },
+              { key: 'fontsOnly', incoming: hashes.fontsOnly,  stored: cand.fonts_only_hash },
             ];
 
-            for (const { key, values, stored } of pairs) {
-              if (!stored) continue;
-              const incoming = values.filter(Boolean);
-              if (incoming.length === 0) continue;
-              total += weights[key];
-              if (incoming.includes(stored)) {
-                score += weights[key];
+            for (const { key, incoming, stored } of stablePairs) {
+              if (stored && incoming && incoming === stored) {
                 matched.push(key);
               }
             }
 
-            const normalized = total > 0 ? score / total : 0;
-
-            // Cross-device link requires: (same IP + ≥1 signal match) OR (≥2 signal matches on any IP)
+            // Cross-device link requires:
+            // - Same IP + at least 1 device-stable signal match (same WiFi, different device)
+            // - OR 2+ device-stable signal matches on any IP (strong device similarity)
             const qualifies = (sameIp && matched.length >= 1) || matched.length >= 2;
+            const score = matched.length / 4; // 4 possible stable signals
 
-            if (qualifies && normalized > linkScore && normalized >= LINK_THRESHOLD) {
-              linkScore = normalized;
+            if (qualifies && score > linkScore && score >= LINK_THRESHOLD) {
+              linkScore = score;
               linkCandidate = cand;
               linkMatched = matched;
             }
@@ -816,7 +884,6 @@ app.post('/v1/fingerprint', async (c) => {
             matchTier = 'cross_device';
             matchedSignals = linkMatched;
             await insertAlias(visitorId);
-            // Create device link
             const linkConf = Math.round(linkScore * 100) / 100;
             const sameIp = normalizeIp(linkCandidate.ip_address) === normalizedClientIp;
             const linkType = sameIp ? 'same_network' : 'signal_overlap';
