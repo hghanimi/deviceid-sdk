@@ -516,11 +516,13 @@ app.post('/v1/fingerprint', async (c) => {
         `INSERT INTO fingerprints
           (visitor_id, raw_hash, canvas_hash, webgl_hash, audio_hash,
            screen_hash, font_hash, browser_hash, hardware_hash,
-           ip_address, is_vpn, is_incognito, headless_score, bot_score, api_key_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+           ip_address, country, first_seen, last_seen, visit_count,
+           is_vpn, is_incognito, headless_score, bot_score, api_key_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW(),NOW(),1,$12,$13,$14,$15,$16)`,
         [vid, hashes.composite, hashes.canvas, hashes.webgl, hashes.audio,
          hashes.screen, hashes.fonts, hashes.browser, hashes.hardware,
-         clientIp, isVpn, evasion?.isPrivate || false, headlessScoreInt, botCount,
+         clientIp, cfData.country || null,
+         isVpn, evasion?.isPrivate || false, headlessScoreInt, botCount,
          apiKeyId]
       );
     };
@@ -529,12 +531,17 @@ app.post('/v1/fingerprint', async (c) => {
     const linkDevices = async (vidA: string, vidB: string, linkType: string, conf: number) => {
       if (vidA === vidB) return;
       const [a, b] = [vidA, vidB].sort(); // canonical order
-      await db.query(
-        `INSERT INTO device_links (visitor_id_a, visitor_id_b, link_type, confidence, api_key_id)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT DO NOTHING`,
-        [a, b, linkType, conf, apiKeyId]
-      );
+      try {
+        await db.query(
+          `INSERT INTO device_links (visitor_id_a, visitor_id_b, link_type, confidence, api_key_id)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT DO NOTHING`,
+          [a, b, linkType, conf, apiKeyId]
+        );
+      } catch (e) {
+        // Non-fatal — linking failure shouldn't break fingerprinting
+        console.error('linkDevices error:', e);
+      }
     };
 
     // ─── Tier 0: StoredId recovery ───────────────────
@@ -759,13 +766,18 @@ app.post('/v1/fingerprint', async (c) => {
     }
 
     // ─── Linked devices (fetch all links for this visitor + transitive) ───
-    const linkedResult = await db.query(
-      `SELECT visitor_id_a, visitor_id_b, link_type, confidence, created_at
-       FROM device_links
-       WHERE (visitor_id_a = $1 OR visitor_id_b = $1) AND api_key_id = $2
-       ORDER BY confidence DESC`,
-      [visitorId, apiKeyId]
-    );
+    let linkedResult = { rows: [] as any[] };
+    try {
+      linkedResult = await db.query(
+        `SELECT visitor_id_a, visitor_id_b, link_type, confidence, created_at
+         FROM device_links
+         WHERE (visitor_id_a = $1 OR visitor_id_b = $1) AND api_key_id = $2
+         ORDER BY confidence DESC`,
+        [visitorId, apiKeyId]
+      );
+    } catch (e) {
+      console.error('device_links query error:', e);
+    }
 
     // Collect all linked visitor IDs
     const linkedVids = linkedResult.rows.map((l: any) =>
