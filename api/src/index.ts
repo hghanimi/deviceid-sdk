@@ -748,6 +748,24 @@ app.post('/v1/fingerprint', async (c) => {
       if (goodBotPatterns.some(p => ua.includes(p))) return 'good';
       return 'bad';
     })();
+
+    // ─── AI AGENT DETECTION ───
+    const KNOWN_AGENTS = [
+      'ChatGPT-User', 'GPTBot', 'Google-Extended', 'Amazonbot',
+      'PerplexityBot', 'ClaudeBot', 'Bytespider', 'cohere-ai',
+      'Browserbase', 'Manus', 'AnchorBrowser', 'anthropic-ai',
+      'CCBot', 'FacebookBot', 'Meta-ExternalAgent',
+    ];
+    const fullUA = c.req.header('User-Agent') || '';
+    const isKnownAgent = KNOWN_AGENTS.some(a => fullUA.includes(a));
+    const visitorType: 'human' | 'known_agent' | 'suspected_agent' | 'unknown' = (() => {
+      if (isKnownAgent) return 'known_agent';
+      if (botClassification === 'bad' || (evasion?.headlessScore || 0) > 0.6) return 'suspected_agent';
+      if (botClassification === 'good') return 'known_agent';
+      if (signalNames.length > 0 && signalsCollected === 0) return 'unknown';
+      return 'human';
+    })();
+
     const normalizedClientIp = normalizeIp(clientIp);
 
     const isIPv4 = (ip: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
@@ -1466,6 +1484,7 @@ app.post('/v1/fingerprint', async (c) => {
           signalsCollected,
           proxyType,
           highActivity,
+          visitorType,
           userAgent: c.req.header('User-Agent') || null,
         }), clientIp, apiKeyId]
       );
@@ -1490,6 +1509,7 @@ app.post('/v1/fingerprint', async (c) => {
       matchTier,
       matchedSignals: matchedSignals.length > 0 ? matchedSignals : undefined,
       visitorFound: !isNew,
+      visitorType,
       firstSeenAt: null, // populated from DB on return visits
       lastSeenAt: null,
       browserDetails: {
