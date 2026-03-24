@@ -6,1020 +6,521 @@
   <title>Wayl — Device Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:         #07090f;
-      --sidebar:    #0b0e16;
-      --panel:      #0f1219;
-      --panel-2:    #141820;
-      --card:       #12161e;
-      --border:     rgba(255,255,255,0.05);
-      --border-2:   rgba(255,255,255,0.09);
-      --text:       #e2e8f0;
-      --text-2:     #94a3b8;
-      --muted:      #64748b;
-      --brand:      #10b981;
-      --brand-2:    #34d399;
-      --brand-dim:  rgba(16,185,129,0.08);
-      --accent:     #818cf8;
-      --accent-dim: rgba(129,140,248,0.10);
-      --ok:         #10b981;
-      --ok-dim:     rgba(16,185,129,0.08);
+      --bg:         #fafafa;
+      --surface:    #ffffff;
+      --surface-2:  #f5f3ff;
+      --border:     #e9e5f5;
+      --border-2:   #d4d0e8;
+      --text:       #1e1b2e;
+      --text-2:     #6b6585;
+      --muted:      #9f97b8;
+      --brand:      #7c5cfc;
+      --brand-light:#ede9fe;
+      --brand-dark: #5b3ed9;
+      --ok:         #22c55e;
+      --ok-bg:      #f0fdf4;
       --warn:       #f59e0b;
-      --warn-dim:   rgba(245,158,11,0.08);
+      --warn-bg:    #fffbeb;
       --danger:     #ef4444;
-      --danger-dim: rgba(239,68,68,0.08);
+      --danger-bg:  #fef2f2;
+      --accent:     #a78bfa;
+      --accent-bg:  #f5f3ff;
       --font:       'Inter', -apple-system, system-ui, sans-serif;
-      --mono:       'JetBrains Mono', 'SF Mono', monospace;
-      --radius:     8px;
-      --radius-lg:  12px;
+      --mono:       ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+      --radius:     10px;
+      --radius-lg:  14px;
+      --shadow:     0 1px 3px rgba(124,92,252,0.04), 0 1px 2px rgba(0,0,0,0.03);
+      --shadow-lg:  0 4px 12px rgba(124,92,252,0.06), 0 1px 3px rgba(0,0,0,0.04);
     }
     html, body { height: 100%; overflow: hidden; }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); display: flex; font-size: 12px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 
-    /* ── SIDEBAR ── */
-    .sidebar { width: 220px; min-width: 220px; height: 100vh; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-    .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 18px 16px; border-bottom: 1px solid var(--border); }
-    .logo-mark { width: 30px; height: 30px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; flex-shrink: 0; }
-    .logo-name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
-    .logo-tag  { font-size: 10px; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
-    .sidebar-nav { flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
-    .nav-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 14px 8px 6px; }
-    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius); cursor: pointer; color: var(--muted); transition: all 0.15s; user-select: none; font-size: 13px; font-weight: 500; }
-    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
-    .nav-item.active { background: var(--brand-dim); color: var(--brand); font-weight: 600; }
-    .nav-badge { margin-left: auto; background: var(--danger); color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; padding: 1px 7px; display: none; line-height: 1.5; }
+    .sidebar { width: 200px; min-width: 200px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+    .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 16px 16px; }
+    .logo-mark { width: 28px; height: 28px; background: linear-gradient(135deg, #7c5cfc, #a78bfa); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; }
+    .logo-name { font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: -0.02em; }
+    .logo-tag  { font-size: 10px; color: var(--muted); font-weight: 500; }
+    .sidebar-nav { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+    .nav-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 16px 10px 6px; }
+    .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--text-2); transition: all 0.15s; font-size: 12px; font-weight: 500; }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item.active { background: var(--brand-light); color: var(--brand); font-weight: 600; }
+    .nav-item svg { opacity: 0.5; }
+    .nav-item.active svg { opacity: 1; }
+    .nav-badge { margin-left: auto; background: var(--danger); color: #fff; border-radius: 10px; font-size: 9px; font-weight: 700; padding: 1px 6px; display: none; line-height: 1.5; }
     .nav-badge.show { display: inline-block; }
-    .sidebar-footer { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
-    .status-dot { display: inline-block; width: 7px; height: 7px; background: var(--ok); border-radius: 50%; margin-right: 6px; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+    .sidebar-footer { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted); }
+    .status-dot { display: inline-block; width: 6px; height: 6px; background: var(--ok); border-radius: 50%; margin-right: 5px; }
 
-    /* ── MAIN ── */
     .main { flex: 1; height: 100vh; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
-    .topbar { height: 52px; min-height: 52px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 10px; }
-    .topbar-title { font-size: 15px; font-weight: 700; }
-    .topbar-sub { font-size: 12px; color: var(--muted); flex: 1; }
-    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--radius); font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-2); background: transparent; color: var(--text); font-family: var(--font); transition: all 0.15s; }
-    .btn:hover { background: var(--panel-2); border-color: var(--brand); color: var(--brand); }
-    .btn-brand { background: var(--brand); color: #000; border-color: var(--brand); }
-    .btn-brand:hover { background: var(--brand-2); border-color: var(--brand-2); }
+    .topbar { height: 48px; min-height: 48px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 10px; background: var(--surface); }
+    .topbar-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .topbar-sub { font-size: 11px; color: var(--muted); flex: 1; }
+    .btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-family: var(--font); transition: all 0.15s; }
+    .btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
 
-    /* ── PAGES ── */
     .page { flex: 1; overflow-y: auto; padding: 20px 24px; display: none; }
     .page.active { display: block; }
 
-    /* ── KPI GRID ── */
-    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
-    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; position: relative; overflow: hidden; }
-    .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.6; }
-    .kpi.k-brand::before { background: var(--brand); }
-    .kpi.k-accent::before { background: var(--accent); }
-    .kpi.k-warn::before { background: var(--warn); }
-    .kpi.k-danger::before { background: var(--danger); }
-    .kpi.k-ok::before { background: var(--ok); }
-    .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
-    .kpi-value { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
-    .kpi-sub { font-size: 11px; color: var(--text-2); margin-top: 6px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; box-shadow: var(--shadow); }
+    .kpi-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
+    .kpi-value { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--text); }
+    .kpi-sub { font-size: 10px; color: var(--text-2); margin-top: 4px; }
 
-    /* ── PANELS ── */
-    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 16px; }
-    .panel-head { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); gap: 10px; }
-    .panel-title { font-size: 13px; font-weight: 700; flex: 1; }
-    .panel-body { padding: 18px; }
-    .panel-sub { font-size: 11px; color: var(--muted); }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 14px; box-shadow: var(--shadow); }
+    .panel-head { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 8px; }
+    .panel-title { font-size: 12px; font-weight: 600; flex: 1; color: var(--text); }
+    .panel-body { padding: 16px; }
+    .panel-sub { font-size: 10px; color: var(--muted); }
 
-    /* ── TABLE ── */
     .tbl-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
-    th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; background: var(--panel-2); }
-    td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+    th { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 11px; vertical-align: middle; color: var(--text-2); }
     tr:last-child td { border-bottom: none; }
     tr.clk { cursor: pointer; transition: background 0.12s; }
-    tr.clk:hover td { background: rgba(16,185,129,0.04); }
-    .mono { font-family: var(--mono); font-size: 11px; }
+    tr.clk:hover td { background: var(--surface-2); }
+    .mono { font-family: var(--mono); font-size: 10px; }
 
-    /* ── BADGES ── */
-    .badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; white-space: nowrap; letter-spacing: 0.02em; }
-    .b-ok     { background: var(--ok-dim);     color: var(--ok);     border: 1px solid rgba(16,185,129,0.15); }
-    .b-warn   { background: var(--warn-dim);   color: var(--warn);   border: 1px solid rgba(245,158,11,0.15); }
-    .b-danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(239,68,68,0.15); }
-    .b-muted  { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
-    .b-brand  { background: var(--brand-dim);  color: var(--brand);  border: 1px solid rgba(16,185,129,0.15); }
-    .b-accent { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(129,140,248,0.15); }
+    .badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 6px; font-size: 9px; font-weight: 600; white-space: nowrap; }
+    .b-ok     { background: var(--ok-bg);     color: var(--ok); }
+    .b-warn   { background: var(--warn-bg);   color: var(--warn); }
+    .b-danger { background: var(--danger-bg); color: var(--danger); }
+    .b-muted  { background: var(--surface-2); color: var(--muted); }
+    .b-brand  { background: var(--brand-light); color: var(--brand); }
+    .b-accent { background: var(--accent-bg); color: var(--accent); }
 
-    /* ── RISK PILL ── */
-    .rpill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-family: var(--mono); font-size: 11px; font-weight: 600; min-width: 50px; text-align: center; }
-    .rp-low  { background: rgba(16,185,129,0.10); color: #10b981; border: 1px solid rgba(16,185,129,0.20); }
-    .rp-med  { background: rgba(245,158,11,0.10); color: #f59e0b; border: 1px solid rgba(245,158,11,0.20); }
-    .rp-high { background: rgba(239,68,68,0.10); color: #ef4444; border: 1px solid rgba(239,68,68,0.20); }
+    .rpill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-family: var(--mono); font-size: 10px; font-weight: 600; }
+    .rp-low  { background: var(--ok-bg); color: var(--ok); }
+    .rp-med  { background: var(--warn-bg); color: var(--warn); }
+    .rp-high { background: var(--danger-bg); color: var(--danger); }
 
-    /* ── SIGNAL BAR ── */
-    .sig-bar { display: flex; align-items: center; gap: 6px; }
-    .sig-bar-fill { height: 4px; border-radius: 2px; background: var(--border-2); flex: 1; max-width: 80px; position: relative; overflow: hidden; }
-    .sig-bar-fill > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; transition: width 0.3s; }
-    .sig-bar-label { font-family: var(--mono); font-size: 10px; color: var(--text-2); min-width: 32px; }
+    .chart-wrap { position: relative; height: 160px; }
 
-    /* ── CHART ── */
-    .chart-wrap { position: relative; height: 180px; }
+    .filter-bar { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; align-items: center; }
+    .fi { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font); font-size: 11px; padding: 6px 10px; outline: none; transition: border-color 0.15s; }
+    .fi:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(124,92,252,0.08); }
+    input.fi { flex: 1; min-width: 160px; }
+    .fi-count { font-size: 10px; color: var(--muted); margin-left: auto; font-weight: 500; }
 
-    /* ── FILTER BAR ── */
-    .filter-bar { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); flex-wrap: wrap; align-items: center; }
-    .fi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--font); font-size: 12px; padding: 6px 12px; outline: none; transition: border-color 0.15s; }
-    .fi:focus { border-color: var(--brand); }
-    input.fi { flex: 1; min-width: 180px; }
-    .fi-count { font-size: 11px; color: var(--muted); margin-left: auto; font-weight: 500; }
-
-    /* ── SLIDE-OUT ── */
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(2px); }
+    .overlay { position: fixed; inset: 0; background: rgba(30,27,46,0.15); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; backdrop-filter: blur(4px); }
     .overlay.open { opacity: 1; pointer-events: all; }
-    .slideout { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; background: var(--panel); border-left: 1px solid var(--border-2); z-index: 101; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.25s cubic-bezier(0.22,0.58,0.12,1); overflow: hidden; }
+    .slideout { position: fixed; top: 0; right: 0; bottom: 0; width: 440px; background: var(--surface); border-left: 1px solid var(--border); z-index: 101; display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.25s cubic-bezier(0.22,0.58,0.12,1); overflow: hidden; box-shadow: -8px 0 24px rgba(124,92,252,0.06); }
     .slideout.open { transform: translateX(0); }
-    .so-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; background: var(--panel-2); }
+    .so-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; }
     .so-body { flex: 1; overflow-y: auto; }
-    .btn-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 22px; padding: 2px 4px; line-height: 1; margin-left: auto; border-radius: 4px; transition: all 0.1s; }
-    .btn-x:hover { color: var(--text); background: rgba(255,255,255,0.06); }
-    .so-sec { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .btn-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 2px 6px; line-height: 1; margin-left: auto; border-radius: 6px; transition: all 0.1s; }
+    .btn-x:hover { color: var(--text); background: var(--surface-2); }
+    .so-sec { padding: 14px 20px; border-bottom: 1px solid var(--border); }
     .so-sec:last-child { border-bottom: none; }
-    .so-sec-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-    .so-sec-count { font-weight: 600; color: var(--text-2); }
-    .dr { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; font-size: 12px; }
+    .so-sec-title { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .so-sec-count { font-weight: 500; color: var(--text-2); }
+    .dr { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 11px; }
     .dr + .dr { border-top: 1px solid var(--border); }
     .dk { color: var(--muted); font-weight: 500; }
-    .dv { font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+    .dv { font-family: var(--mono); font-size: 10px; color: var(--text-2); }
 
-    /* ── SIGNAL GROUP CARD ── */
-    .sg-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+    .sg-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
     .sg-card:last-child { margin-bottom: 0; }
-    .sg-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; transition: background 0.12s; }
-    .sg-head:hover { background: rgba(255,255,255,0.02); }
-    .sg-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
-    .sg-icon.render  { background: rgba(168,85,247,0.12); color: #a855f7; }
-    .sg-icon.gpu     { background: rgba(59,130,246,0.12); color: #3b82f6; }
-    .sg-icon.audio   { background: rgba(236,72,153,0.12); color: #ec4899; }
-    .sg-icon.display { background: rgba(6,182,212,0.12); color: #06b6d4; }
-    .sg-icon.type    { background: rgba(245,158,11,0.12); color: #f59e0b; }
-    .sg-icon.browser { background: rgba(16,185,129,0.12); color: #10b981; }
-    .sg-icon.cpu     { background: rgba(129,140,248,0.12); color: #818cf8; }
-    .sg-name { font-size: 12px; font-weight: 600; flex: 1; }
-    .sg-hash { font-family: var(--mono); font-size: 10px; color: var(--muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sg-signals { padding: 0 14px 12px; }
-    .sg-sig { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 11px; color: var(--text-2); }
+    .sg-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; transition: background 0.12s; }
+    .sg-head:hover { background: var(--surface-2); }
+    .sg-icon { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+    .sg-icon.render  { background: rgba(168,85,247,0.08); color: #a855f7; }
+    .sg-icon.gpu     { background: rgba(59,130,246,0.08); color: #3b82f6; }
+    .sg-icon.audio   { background: rgba(236,72,153,0.08); color: #ec4899; }
+    .sg-icon.display { background: rgba(6,182,212,0.08); color: #06b6d4; }
+    .sg-icon.type    { background: rgba(245,158,11,0.08); color: #f59e0b; }
+    .sg-icon.browser { background: rgba(124,92,252,0.08); color: #7c5cfc; }
+    .sg-icon.cpu     { background: rgba(167,139,250,0.08); color: #a78bfa; }
+    .sg-name { font-size: 11px; font-weight: 600; flex: 1; }
+    .sg-hash { font-family: var(--mono); font-size: 9px; color: var(--muted); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sg-signals { padding: 0 12px 10px; }
+    .sg-sig { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 10px; color: var(--text-2); }
     .sg-sig::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--border-2); flex-shrink: 0; }
-    .sg-sig.active::before { background: var(--brand); box-shadow: 0 0 4px rgba(16,185,129,0.4); }
+    .sg-sig.active::before { background: var(--brand); }
 
-    /* ── DEV PAGE ── */
-    .code-block { background: #04070c; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; font-family: var(--mono); font-size: 11px; color: #93c5fd; overflow-x: auto; white-space: pre; margin: 6px 0 14px; line-height: 1.6; }
-    .copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: var(--font); transition: all 0.12s; }
+    .code-block { background: #1e1b2e; border-radius: 8px; padding: 14px 16px; font-family: var(--mono); font-size: 10px; color: #c4b5fd; overflow-x: auto; white-space: pre; margin: 6px 0 12px; line-height: 1.6; }
+    .copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 10px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-family: var(--font); transition: all 0.12s; }
     .copy-btn:hover { border-color: var(--brand); color: var(--brand); }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-    /* ── MISC ── */
-    .loading { text-align: center; padding: 40px 0; color: var(--muted); }
-    .spin { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border-2); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 8px; }
+    .loading { text-align: center; padding: 32px 0; color: var(--muted); font-size: 11px; }
+    .spin { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.7s linear infinite; margin-bottom: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .sigs { display: flex; gap: 4px; flex-wrap: wrap; }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
-    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 800px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } .slideout { width: 100%; } }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-2); }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 800px) { .kpi-grid { grid-template-columns: 1fr; } .slideout { width: 100%; } .sidebar { display: none; } }
   </style>
 </head>
 <body>
 
-<!-- ══ SIDEBAR ══ -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <div class="logo-mark">W</div>
-    <div>
-      <div class="logo-name">Wayl</div>
-      <div class="logo-tag">Device Intelligence</div>
-    </div>
+    <div><div class="logo-name">Wayl</div><div class="logo-tag">Device Intelligence</div></div>
   </div>
   <nav class="sidebar-nav">
     <div class="nav-label">Monitor</div>
     <div class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z"/></svg>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z" opacity="0.7"/></svg>
       Overview
     </div>
     <div class="nav-item" data-tab="events" onclick="switchTab('events')">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h8v1H2v-1z"/></svg>
-      Event Logs
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h8v1H2v-1z" opacity="0.7"/></svg>
+      Events
       <span class="nav-badge" id="riskBadge">0</span>
     </div>
     <div class="nav-item" data-tab="identities" onclick="switchTab('identities')">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="5" r="2.5"/><path d="M3 13c0-3 10-3 10 0H3z"/></svg>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="5" r="2.5" opacity="0.7"/><path d="M3 13c0-3 10-3 10 0H3z" opacity="0.7"/></svg>
       Identities
     </div>
     <div class="nav-label">Configure</div>
     <div class="nav-item" data-tab="developers" onclick="switchTab('developers')">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.7 4.3L1 8l4.7 3.7.6-.8L2.6 8l3.7-2.9-.6-.8zm4.6 0l-.6.8L13.4 8l-3.7 2.9.6.8L15 8l-4.7-3.7z"/></svg>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.7 4.3L1 8l4.7 3.7.6-.8L2.6 8l3.7-2.9-.6-.8zm4.6 0l-.6.8L13.4 8l-3.7 2.9.6.8L15 8l-4.7-3.7z" opacity="0.7"/></svg>
       Developers
     </div>
   </nav>
-  <div class="sidebar-footer">
-    <div><span class="status-dot"></span>API Connected</div>
-    <div id="lastRefresh" style="margin-top:5px;">—</div>
-  </div>
+  <div class="sidebar-footer"><div><span class="status-dot"></span>Connected</div><div id="lastRefresh" style="margin-top:4px">—</div></div>
 </aside>
 
-<!-- ══ MAIN ══ -->
 <div class="main">
   <div class="topbar">
     <div class="topbar-title" id="pageTitle">Overview</div>
-    <div class="topbar-sub" id="pageSub">24h rolling window · Auto-refreshes every 30s</div>
-    <button class="btn" onclick="loadDashboard(true)">&#x21bb; Refresh</button>
+    <div class="topbar-sub" id="pageSub">24h rolling · auto-refresh 30s</div>
+    <button class="btn" onclick="loadDashboard()">&#x21bb; Refresh</button>
   </div>
 
-  <!-- === OVERVIEW === -->
   <div id="page-overview" class="page active">
     <div class="kpi-grid">
-      <div class="kpi k-brand">
-        <div class="kpi-label">Total Events</div>
-        <div class="kpi-value c-brand" id="kpi-events">—</div>
-        <div class="kpi-sub" id="kpi-events-d">Loading…</div>
-      </div>
-      <div class="kpi k-accent">
-        <div class="kpi-label">Unique Visitors</div>
-        <div class="kpi-value" id="kpi-visitors" style="color:var(--accent)">—</div>
-        <div class="kpi-sub" id="kpi-visitors-d"></div>
-      </div>
-      <div class="kpi k-ok">
-        <div class="kpi-label">New Devices</div>
-        <div class="kpi-value" id="kpi-new" style="color:var(--ok)">—</div>
-        <div class="kpi-sub" id="kpi-new-d">First-time visitors</div>
-      </div>
-      <div class="kpi k-danger">
-        <div class="kpi-label">High Risk Rate</div>
-        <div class="kpi-value" id="kpi-risk">—</div>
-        <div class="kpi-sub" id="kpi-risk-d"></div>
-      </div>
-      <div class="kpi k-warn">
-        <div class="kpi-label">Avg Risk Score</div>
-        <div class="kpi-value" id="kpi-avgrisk">—</div>
-        <div class="kpi-sub" id="kpi-avgrisk-d"></div>
-      </div>
+      <div class="kpi"><div class="kpi-label">Total Events</div><div class="kpi-value" id="kpi-events" style="color:var(--brand)">—</div><div class="kpi-sub" id="kpi-events-d">Loading…</div></div>
+      <div class="kpi"><div class="kpi-label">Unique Visitors</div><div class="kpi-value" id="kpi-visitors" style="color:var(--accent)">—</div><div class="kpi-sub" id="kpi-visitors-d"></div></div>
+      <div class="kpi"><div class="kpi-label">New Devices</div><div class="kpi-value" id="kpi-new" style="color:var(--ok)">—</div><div class="kpi-sub" id="kpi-new-d">First-time</div></div>
+      <div class="kpi"><div class="kpi-label">High Risk Rate</div><div class="kpi-value" id="kpi-risk">—</div><div class="kpi-sub" id="kpi-risk-d"></div></div>
     </div>
-
-    <!-- Identity Linking KPI Row -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">
-      <div class="kpi k-accent">
-        <div class="kpi-label">Linked Identities</div>
-        <div class="kpi-value" id="kpi-linked" style="color:var(--accent)">—</div>
-        <div class="kpi-sub" id="kpi-linked-d">Cross-device links</div>
-      </div>
-      <div class="kpi k-brand">
-        <div class="kpi-label">VPN Detected</div>
-        <div class="kpi-value" id="kpi-vpn" style="color:var(--warn)">—</div>
-        <div class="kpi-sub" id="kpi-vpn-d"></div>
-      </div>
-      <div class="kpi k-warn">
-        <div class="kpi-label">Incognito Detected</div>
-        <div class="kpi-value" id="kpi-incog" style="color:var(--warn)">—</div>
-        <div class="kpi-sub" id="kpi-incog-d"></div>
-      </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Persons</div><div class="kpi-value" id="kpi-persons" style="color:var(--brand)">—</div><div class="kpi-sub" id="kpi-persons-d">Unique identities</div></div>
+      <div class="kpi"><div class="kpi-label">Linked Devices</div><div class="kpi-value" id="kpi-linked" style="color:var(--accent)">—</div><div class="kpi-sub" id="kpi-linked-d">Cross-device links</div></div>
+      <div class="kpi"><div class="kpi-label">VPN Detected</div><div class="kpi-value" id="kpi-vpn" style="color:var(--warn)">—</div><div class="kpi-sub" id="kpi-vpn-d"></div></div>
+      <div class="kpi"><div class="kpi-label">Incognito</div><div class="kpi-value" id="kpi-incog" style="color:var(--warn)">—</div><div class="kpi-sub" id="kpi-incog-d"></div></div>
     </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:14px;margin-bottom:14px">
       <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Events · 24h</div>
-          <span class="badge b-ok" style="font-size:10px">Trusted</span>
-          <span class="badge b-danger" style="font-size:10px">High Risk</span>
-        </div>
-        <div class="panel-body">
-          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-        </div>
+        <div class="panel-head"><div class="panel-title">Events · 24h</div><span class="badge b-ok" style="font-size:9px">Trusted</span><span class="badge b-danger" style="font-size:9px">Risk</span></div>
+        <div class="panel-body"><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>
       </div>
       <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">Signal Coverage</div>
-          <div class="panel-sub">22 signals · v3 SDK</div>
-        </div>
-        <div class="panel-body" id="signal-coverage-body">
-          <div class="loading">Loading…</div>
-        </div>
+        <div class="panel-head"><div class="panel-title">Signal Coverage</div><div class="panel-sub">7 groups</div></div>
+        <div class="panel-body" id="signal-coverage-body"><div class="loading">Loading…</div></div>
       </div>
     </div>
-
     <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">Merchants</div>
-        <span id="merchant-count" class="panel-sub"></span>
-      </div>
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>Merchant</th><th>API Key</th><th>Events</th><th>Unique Devices</th><th>High Risk</th><th>Risk Rate</th></tr></thead>
-          <tbody id="merchants-tbody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
-        </table>
-      </div>
+      <div class="panel-head"><div class="panel-title">Merchants</div><span id="merchant-count" class="panel-sub"></span></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Merchant</th><th>Key</th><th>Events</th><th>Devices</th><th>Risk</th><th>Rate</th></tr></thead><tbody id="merchants-tbody"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody></table></div>
     </div>
   </div>
 
-  <!-- === EVENT LOGS === -->
   <div id="page-events" class="page" style="padding:0;display:flex;flex-direction:column;">
     <div class="filter-bar">
-      <input class="fi" type="text" id="evtSearch" placeholder="Search visitor ID, IP, merchant…" oninput="applyFilter()" />
+      <input class="fi" type="text" id="evtSearch" placeholder="Search visitor, IP, merchant…" oninput="applyFilter()" />
       <select class="fi" id="evtMerchant" onchange="applyFilter()"><option value="">All Merchants</option></select>
-      <select class="fi" id="evtRisk" onchange="applyFilter()">
-        <option value="">All Risk Levels</option>
-        <option value="high">High Risk Only</option>
-        <option value="clean">Clean Only</option>
-      </select>
+      <select class="fi" id="evtRisk" onchange="applyFilter()"><option value="">All</option><option value="high">High Risk</option><option value="clean">Clean</option></select>
       <span class="fi-count" id="evts-count"></span>
     </div>
-    <div style="flex:1;overflow:auto;">
-      <table style="min-width:1000px">
-        <thead><tr>
-          <th>Timestamp</th>
-          <th>Visitor ID</th>
-          <th>Merchant</th>
-          <th>Match Tier</th>
-          <th>Risk Score</th>
-          <th>IP Address</th>
-          <th>Signals</th>
-          <th style="text-align:center">New?</th>
-        </tr></thead>
-        <tbody id="events-tbody"><tr><td colspan="8" class="loading"><div class="spin"></div><br>Loading events…</td></tr></tbody>
-      </table>
-    </div>
+    <div style="flex:1;overflow:auto;"><table style="min-width:900px"><thead><tr><th>Time</th><th>Visitor</th><th>Merchant</th><th>Tier</th><th>Risk</th><th>IP</th><th>Flags</th></tr></thead><tbody id="events-tbody"><tr><td colspan="7" class="loading"><div class="spin"></div><br>Loading…</td></tr></tbody></table></div>
   </div>
 
-  <!-- === IDENTITIES === -->
   <div id="page-identities" class="page" style="padding:0;display:flex;flex-direction:column;">
     <div class="filter-bar">
-      <input class="fi" type="text" id="idSearch" placeholder="Search visitor ID or IP…" oninput="applyIdFilter()" />
-      <select class="fi" id="idRisk" onchange="applyIdFilter()">
-        <option value="">All</option>
-        <option value="high">Flagged Only</option>
-      </select>
+      <input class="fi" type="text" id="idSearch" placeholder="Search visitor or IP…" oninput="applyIdFilter()" />
+      <select class="fi" id="idRisk" onchange="applyIdFilter()"><option value="">All</option><option value="high">Flagged</option></select>
       <span class="fi-count" id="ids-count"></span>
     </div>
-    <div style="flex:1;overflow:auto;">
-      <table style="min-width:900px">
-        <thead><tr>
-          <th>Visitor ID</th>
-          <th>Merchant</th>
-          <th>First Seen</th>
-          <th>Last Seen</th>
-          <th>Risk Score</th>
-          <th>Signals</th>
-          <th style="text-align:center">Links</th>
-          <th style="text-align:center">Visits</th>
-        </tr></thead>
-        <tbody id="identities-tbody"><tr><td colspan="8" class="loading"><div class="spin"></div><br>Loading identities…</td></tr></tbody>
-      </table>
-    </div>
+    <div style="flex:1;overflow:auto;"><table style="min-width:800px"><thead><tr><th>Visitor</th><th>Merchant</th><th>First Seen</th><th>Last Seen</th><th>Risk</th><th>Flags</th><th style="text-align:center">Links</th><th style="text-align:center">Visits</th></tr></thead><tbody id="identities-tbody"><tr><td colspan="8" class="loading"><div class="spin"></div><br>Loading…</td></tr></tbody></table></div>
   </div>
 
-  <!-- === DEVELOPERS === -->
   <div id="page-developers" class="page">
-    <div class="grid-2" style="margin-bottom:16px">
+    <div class="grid-2" style="margin-bottom:14px">
       <div class="panel">
-        <div class="panel-head"><div class="panel-title">Active API Keys</div></div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr><th>Name</th><th>Public Key</th><th>Status</th><th>Created</th></tr></thead>
-            <tbody id="keys-tbody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
-          </table>
-        </div>
+        <div class="panel-head"><div class="panel-title">API Keys</div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Key</th><th>Status</th><th>Created</th></tr></thead><tbody id="keys-tbody"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
       <div class="panel">
-        <div class="panel-head"><div class="panel-title">API Endpoints</div></div>
-        <div class="panel-body" style="font-size:12px">
-          <div style="margin-bottom:12px">
-            <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;font-weight:600">Base URL</div>
-            <div class="mono" style="color:var(--brand);font-size:12px">https://api.arch-hayder.workers.dev</div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <div class="dr"><span class="mono"><span class="badge b-brand">POST</span> /v1/fingerprint</span><span style="color:var(--muted)">Identify device</span></div>
-            <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /v1/dashboard</span><span style="color:var(--muted)">Portfolio overview</span></div>
-            <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /v1/visitor/:id</span><span style="color:var(--muted)">Device profile</span></div>
-            <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /health</span><span style="color:var(--muted)">Healthcheck</span></div>
+        <div class="panel-head"><div class="panel-title">Endpoints</div></div>
+        <div class="panel-body" style="font-size:11px">
+          <div style="margin-bottom:10px"><div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;font-weight:600">Base URL</div><div class="mono" style="color:var(--brand);font-size:11px">https://api.arch-hayder.workers.dev</div></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div class="dr"><span class="mono"><span class="badge b-brand">POST</span> /v1/fingerprint</span><span style="color:var(--muted);font-size:10px">Identify</span></div>
+            <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /v1/dashboard</span><span style="color:var(--muted);font-size:10px">Dashboard</span></div>
+            <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /v1/visitor/:id</span><span style="color:var(--muted);font-size:10px">Profile</span></div>
+            <div class="dr"><span class="mono"><span class="badge b-ok">GET</span> /health</span><span style="color:var(--muted);font-size:10px">Health</span></div>
           </div>
         </div>
       </div>
     </div>
-
     <div class="panel">
-      <div class="panel-head"><div class="panel-title">SDK Quick Start</div></div>
+      <div class="panel-head"><div class="panel-title">Quick Start</div></div>
       <div class="panel-body">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:11px;color:var(--muted);font-weight:500">1. Add the SDK</span>
-          <button class="copy-btn" onclick="copyEl('snip-script')">Copy</button>
-        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-size:10px;color:var(--muted);font-weight:500">1. Add the SDK</span><button class="copy-btn" onclick="copyEl('snip-script')">Copy</button></div>
         <div class="code-block" id="snip-script">&lt;script src="https://deviceid-cdn.pages.dev/deviceid.min.js"&gt;&lt;/script&gt;</div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:11px;color:var(--muted);font-weight:500">2. Initialize &amp; identify</span>
-          <button class="copy-btn" onclick="copyEl('snip-init')">Copy</button>
-        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-size:10px;color:var(--muted);font-weight:500">2. Initialize &amp; identify</span><button class="copy-btn" onclick="copyEl('snip-init')">Copy</button></div>
         <div class="code-block" id="snip-init">const sdk = new DeviceID({
   apiKey: 'pk_live_YOUR_KEY',
   endpoint: 'https://api.arch-hayder.workers.dev'
 });
 
 sdk.identify().then(result =&gt; {
-  console.log(result.visitorId);     // stable device ID
-  console.log(result.riskScore);     // 0-100
-  console.log(result.confidence);    // match certainty
-  console.log(result.matchTier);     // stored_id | exact | fuzzy | cross_device | new
-  console.log(result.identity);      // linked devices &amp; cross-device graph
-  console.log(result.riskSignals);   // vpn, bot, incognito, ipChanged, linkedRisk
-  console.log(result.geo);           // country, city, ASN
+  console.log(result.visitorId);
+  console.log(result.riskScore);
+  console.log(result.confidence);
+  console.log(result.matchTier);
 });</div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-          <span style="font-size:11px;color:var(--muted);font-weight:500">3. API Response Format</span>
-          <button class="copy-btn" onclick="copyEl('snip-resp')">Copy</button>
-        </div>
-        <div class="code-block" id="snip-resp">{
-  "visitorId": "dvc_a1b2c3d4e5f6",
-  "isNew": false,
-  "confidence": 0.92,
-  "matchTier": "stored_id",      // stored_id | exact | fuzzy | cross_device | new
-  "matchedSignals": ["canvas", "webgl", "fonts", "browser", "audio"],
-  "riskScore": 15,
-  "riskSignals": {
-    "vpn": false, "incognito": false, "headless": false,
-    "bot": false, "tampered": false, "multiAccount": false,
-    "ipChanged": true,
-    "linkedRisk": { "vpn": false, "incognito": false, "headless": false, "bot": false }
-  },
-  "identity": {
-    "linkedDeviceCount": 2,
-    "linkedVisitorIds": ["dvc_x9y8z7..."],
-    "links": [{ "visitorId": "dvc_x9y8z7...", "linkType": "same_network", "confidence": 0.45 }],
-    "previousIp": "203.0.113.5",
-    "currentIp": "203.0.113.1"
-  },
-  "signals": {
-    "collected": 19,             // out of 22 total
-    "total": 19,
-    "hashes": { ... },           // individual SHA-256 per signal
-    "groups": {                  // 7 composite groups for matching
-      "canvas":   { "hash": "a1b2...", "signals": ["canvas"] },
-      "webgl":    { "hash": "c3d4...", "signals": ["webgl","webglRender"] },
-      "audio":    { "hash": "e5f6...", "signals": ["audio"] },
-      "screen":   { "hash": "g7h8...", "signals": ["screen","clientRects"] },
-      "fonts":    { "hash": "i9j0...", "signals": ["fonts","arabicFonts","emoji"] },
-      "browser":  { "hash": "k1l2...", "signals": ["intlProbe","cssSupports","codecs","voices"] },
-      "hardware": { "hash": "m3n4...", "signals": ["hardware","mathml","browser"] }
-    }
-  },
-  "ip": "203.0.113.1",
-  "geo": { "country": "IQ", "city": "Baghdad", "timezone": "Asia/Baghdad", "asOrganization": "..." },
-  "linkedDevices": 2,
-  "processingMs": 42,
-  "sdkVersion": "3.0.0"
-}</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══ VISITOR SLIDE-OUT ══ -->
 <div class="overlay" id="overlay" onclick="closeSlideout()"></div>
 <div class="slideout" id="slideout">
   <div class="so-head">
-    <div>
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:4px">Visitor Profile</div>
-      <div class="mono" id="so-vid" style="font-size:13px;color:var(--brand)">—</div>
-    </div>
+    <div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:3px">Visitor</div><div class="mono" id="so-vid" style="font-size:12px;color:var(--brand)">—</div></div>
     <button class="btn-x" onclick="closeSlideout()">&times;</button>
   </div>
-  <div class="so-body" id="so-body">
-    <div class="loading"><div class="spin"></div></div>
-  </div>
+  <div class="so-body" id="so-body"><div class="loading"><div class="spin"></div></div></div>
 </div>
 
 <script>
-  const API = 'https://api.arch-hayder.workers.dev';
-  const KEY = 'pk_live_wayl_001';
-  let data = null;
-  let allEvents = [];
-  let eventLogEntries = [];
-  let uniqIdentities = [];
-  let trendChart = null;
+const API='https://api.arch-hayder.workers.dev';
+const KEY='pk_live_wayl_001';
+let data=null,allEvents=[],eventLogEntries=[],uniqIdentities=[],trendChart=null;
 
-  // ── Signal group definitions (mirrors Worker v3 grouping) ──
-  const SIGNAL_GROUPS = [
-    { key: 'canvas',   name: 'Canvas',   icon: 'render',  color: '#a855f7', signals: ['Canvas rendering'],                                         desc: 'Browser text & graphics rendering fingerprint' },
-    { key: 'webgl',    name: 'WebGL',    icon: 'gpu',     color: '#3b82f6', signals: ['WebGL params', 'Pixel render hash'],                         desc: 'GPU identity via shader pixel output' },
-    { key: 'audio',    name: 'Audio',    icon: 'audio',   color: '#ec4899', signals: ['Audio pipeline fingerprint'],                                desc: 'Audio processing differences' },
-    { key: 'screen',   name: 'Screen',   icon: 'display', color: '#06b6d4', signals: ['Screen dimensions', 'ClientRects / DOMRect'],                desc: 'Display geometry & element rendering' },
-    { key: 'fonts',    name: 'Fonts',    icon: 'type',    color: '#f59e0b', signals: ['System fonts', 'Arabic fonts', 'Emoji rendering'],           desc: 'Glyph environment with MENA-specific fonts' },
-    { key: 'browser',  name: 'Browser',  icon: 'browser', color: '#10b981', signals: ['Intl API probe', 'CSS.supports()', 'Media codecs', 'SpeechSynthesis voices'], desc: 'Deep platform probe (highest entropy)' },
-    { key: 'hardware', name: 'Hardware', icon: 'cpu',     color: '#818cf8', signals: ['Hardware specs', 'MathML rendering', 'Browser basics'],      desc: 'Platform & hardware identity' },
-  ];
+const SG=[
+  {key:'canvas',name:'Canvas',icon:'render',color:'#a855f7',signals:['Canvas rendering']},
+  {key:'webgl',name:'WebGL',icon:'gpu',color:'#3b82f6',signals:['WebGL params','Pixel render']},
+  {key:'audio',name:'Audio',icon:'audio',color:'#ec4899',signals:['Audio pipeline']},
+  {key:'screen',name:'Screen',icon:'display',color:'#06b6d4',signals:['Resolution','DOMRect']},
+  {key:'fonts',name:'Fonts',icon:'type',color:'#f59e0b',signals:['System fonts','Arabic','Emoji']},
+  {key:'browser',name:'Browser',icon:'browser',color:'#7c5cfc',signals:['Intl','CSS','Codecs','Voices']},
+  {key:'hardware',name:'Hardware',icon:'cpu',color:'#a78bfa',signals:['Specs','MathML','Browser']},
+];
 
-  // ── Volatile signals (not used for matching, used for analysis) ──
-  const VOLATILE_SIGNALS = [
-    { name: 'Timezone',       desc: 'IANA timezone, UTC offset, DST — used for VPN detection' },
-    { name: 'Permissions',    desc: 'Camera, microphone, notification states — used for risk scoring' },
-    { name: 'Storage Quota',  desc: 'Available storage — used for incognito detection' },
-  ];
+function switchTab(n){
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.tab===n));
+  document.querySelectorAll('.page').forEach(el=>{
+    const t=el.id==='page-'+n;
+    el.classList.toggle('active',t);
+    el.style.display=t?((n==='events'||n==='identities')?'flex':'block'):'none';
+  });
+  var titles={overview:'Overview',events:'Events',identities:'Identities',developers:'Developers'};
+  document.getElementById('pageTitle').textContent=titles[n]||n;
+  if(n==='developers')loadDevelopers();
+}
 
-  // ── Tab switching ──
-  function switchTab(name) {
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === name));
-    document.querySelectorAll('.page').forEach(el => {
-      const isTarget = el.id === 'page-' + name;
-      el.classList.toggle('active', isTarget);
-      if (isTarget) el.style.display = (name === 'events' || name === 'identities') ? 'flex' : 'block';
-      else el.style.display = 'none';
+async function loadDashboard(){
+  try{
+    var res=await fetch(API+'/v1/dashboard',{headers:{'x-api-key':KEY}});
+    if(!res.ok){txt('lastRefresh','Error '+res.status);return;}
+    data=await res.json();
+    if(data.error){txt('lastRefresh',data.error);return;}
+    allEvents=data.allEvents||data.riskyEvents||[];
+    eventLogEntries=(data.eventLog||[]).map(function(e){
+      var d=e.eventData||{};
+      return{visitorId:e.visitorId,merchantName:e.merchantName||'\u2014',ipAddress:e.ipAddress,matchTier:d.matchTier||'\u2014',riskScore:d.riskScore||0,isVpn:d.isVpn||false,isNew:d.isNew||false,signalsCollected:d.signalsCollected||0,createdAt:e.createdAt};
     });
-    const titles = { overview: 'Overview', events: 'Event Logs', identities: 'Identities', developers: 'Developers' };
-    document.getElementById('pageTitle').textContent = titles[name] || name;
-    if (name === 'developers') loadDevelopers();
+    var map=new Map();
+    allEvents.forEach(function(e){if(!map.has(e.visitorId))map.set(e.visitorId,e);});
+    uniqIdentities=[...map.values()];
+    var hr=allEvents.filter(function(e){return isHR(e);}).length;
+    var b=document.getElementById('riskBadge');b.textContent=hr;b.classList.toggle('show',hr>0);
+    renderOverview();renderEvents();renderIdentities();
+    txt('lastRefresh',new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){txt('lastRefresh',e.message);}
+}
+
+function renderOverview(){
+  if(!data)return;
+  var o=data.overview;
+  var hr=o.events_24h>0?((o.high_risk_24h/o.events_24h)*100).toFixed(1):'0.0';
+  txt('kpi-events',o.events_24h.toLocaleString());txt('kpi-events-d','Last 24h');
+  txt('kpi-visitors',o.unique_devices_24h.toLocaleString());txt('kpi-visitors-d',o.new_devices_24h+' new');
+  txt('kpi-new',o.new_devices_24h.toLocaleString());
+  txt('kpi-risk',hr+'%');
+  document.getElementById('kpi-risk').style.color=parseFloat(hr)>=15?'var(--danger)':parseFloat(hr)>=5?'var(--warn)':'var(--ok)';
+  txt('kpi-risk-d',o.high_risk_24h+' flagged');
+  txt('kpi-persons',(o.unique_persons||0).toLocaleString());
+  txt('kpi-linked',(o.linked_identities||0).toLocaleString());
+  txt('kpi-vpn',(o.vpn_24h||0).toLocaleString());txt('kpi-vpn-d','VPN sessions');
+  txt('kpi-incog',(o.incognito_24h||0).toLocaleString());txt('kpi-incog-d','Private sessions');
+  try{renderChart();}catch(e){console.error(e);}
+  renderSignals();renderMerchants();
+}
+
+function txt(id,t){document.getElementById(id).textContent=t;}
+
+function renderChart(){
+  var h=data.hourly||[];
+  var labels=h.map(function(x){return new Date(x.hour).getHours().toString().padStart(2,'0')+':00';});
+  var trusted=h.map(function(x){return x.trusted!==undefined?x.trusted:Math.max(0,(x.events||0)-(x.highRisk||0));});
+  var risk=h.map(function(x){return x.highRisk!==undefined?x.highRisk:0;});
+  var ctx=document.getElementById('trendChart').getContext('2d');
+  if(trendChart)trendChart.destroy();
+  trendChart=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[
+    {label:'Trusted',data:trusted,backgroundColor:'rgba(34,197,94,0.3)',borderColor:'rgba(34,197,94,0.45)',borderWidth:1,borderRadius:4,stack:'s'},
+    {label:'Risk',data:risk,backgroundColor:'rgba(239,68,68,0.3)',borderColor:'rgba(239,68,68,0.45)',borderWidth:1,borderRadius:4,stack:'s'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{
+    legend:{position:'top',labels:{color:'#9f97b8',font:{size:10,family:'Inter'},boxWidth:8,padding:12}},
+    tooltip:{backgroundColor:'#1e1b2e',borderColor:'#e9e5f5',borderWidth:1,titleColor:'#fff',bodyColor:'#c4b5fd',padding:8,cornerRadius:8,titleFont:{size:11},bodyFont:{size:10}},
+  },scales:{
+    x:{stacked:true,grid:{color:'rgba(124,92,252,0.04)'},ticks:{color:'#9f97b8',font:{size:9}}},
+    y:{stacked:true,grid:{color:'rgba(124,92,252,0.04)'},ticks:{color:'#9f97b8',font:{size:9},precision:0}},
+  }}});
+}
+
+function renderSignals(){
+  document.getElementById('signal-coverage-body').innerHTML=SG.map(function(g){return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)"><div style="width:7px;height:7px;border-radius:3px;background:'+g.color+';flex-shrink:0"></div><span style="font-size:10px;font-weight:600;flex:1;color:var(--text)">'+g.name+'</span><span style="font-size:9px;color:var(--muted)">'+g.signals.length+'</span></div>';}).join('');
+}
+
+function renderMerchants(){
+  var m=data.merchants||[];
+  txt('merchant-count',m.length+' active');
+  document.getElementById('merchants-tbody').innerHTML=m.map(function(x){
+    var rr=x.events24h>0?((x.highRisk24h/x.events24h)*100).toFixed(1):'0.0';
+    return '<tr><td style="font-weight:600;color:var(--text)">'+esc(x.name)+'</td><td><span class="mono">'+esc(x.publicKey)+'</span></td><td>'+x.events24h+'</td><td>'+x.uniqueDevices24h+'</td><td>'+x.highRisk24h+'</td><td style="font-weight:600;color:'+(parseFloat(rr)>=15?'var(--danger)':parseFloat(rr)>=5?'var(--warn)':'var(--ok)')+'">'+rr+'%</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="loading">No merchants</td></tr>';
+  var sel=document.getElementById('evtMerchant');var cur=sel.value;
+  while(sel.options.length>1)sel.remove(1);
+  m.forEach(function(x){var o=document.createElement('option');o.value=x.publicKey;o.textContent=x.name;sel.appendChild(o);});
+  sel.value=cur;
+}
+
+function applyFilter(){
+  var s=document.getElementById('evtSearch').value.toLowerCase();
+  var m=document.getElementById('evtMerchant').value;
+  var r=document.getElementById('evtRisk').value;
+  var ev=eventLogEntries;
+  if(s)ev=ev.filter(function(e){return(e.visitorId||'').toLowerCase().includes(s)||(e.ipAddress||'').includes(s)||(e.merchantName||'').toLowerCase().includes(s);});
+  if(m)ev=ev.filter(function(e){return e.publicKey===m;});
+  if(r==='high')ev=ev.filter(function(e){return e.riskScore>=40;});
+  if(r==='clean')ev=ev.filter(function(e){return e.riskScore<40;});
+  renderEvRows(ev);
+}
+function renderEvents(){applyFilter();}
+
+function renderEvRows(ev){
+  txt('evts-count',ev.length+' events');
+  document.getElementById('events-tbody').innerHTML=ev.map(function(e){return '<tr class="clk" onclick="openVisitor(\''+esc(e.visitorId)+'\')"><td class="mono" style="color:var(--muted)">'+fmtDate(e.createdAt)+'</td><td><span class="mono" style="color:var(--brand)">'+esc((e.visitorId||'').substring(0,18))+'\u2026</span></td><td>'+esc(e.merchantName)+'</td><td><span class="badge b-brand">'+esc(e.matchTier)+'</span></td><td>'+riskPill(e.riskScore)+'</td><td class="mono">'+esc(e.ipAddress||'\u2014')+'</td><td><div class="sigs">'+(e.isVpn?'<span class="badge b-danger">VPN</span>':'')+(e.isNew?'<span class="badge b-brand">NEW</span>':'')+'</div></td></tr>';}).join('')||'<tr><td colspan="7" class="loading">No events</td></tr>';
+}
+
+function applyIdFilter(){
+  var s=document.getElementById('idSearch').value.toLowerCase();
+  var r=document.getElementById('idRisk').value;
+  var ids=uniqIdentities;
+  if(s)ids=ids.filter(function(e){return(e.visitorId||'').toLowerCase().includes(s)||(e.ipAddress||'').includes(s);});
+  if(r==='high')ids=ids.filter(function(e){return isHR(e);});
+  renderIdRows(ids);
+}
+function renderIdentities(){applyIdFilter();}
+
+function renderIdRows(ids){
+  txt('ids-count',ids.length+' identities');
+  document.getElementById('identities-tbody').innerHTML=ids.map(function(e){
+    var risk=calcRisk(e),lc=e.linkedCount||0;
+    return '<tr class="clk" onclick="openVisitor(\''+esc(e.visitorId)+'\')"><td><span class="mono" style="color:var(--brand)">'+esc(e.visitorId||'\u2014')+'</span></td><td style="color:var(--text-2)">'+esc(e.merchantName||'\u2014')+'</td><td class="mono" style="color:var(--muted)">'+fmtDate(e.firstSeen||e.lastSeen)+'</td><td class="mono" style="color:var(--muted)">'+fmtDate(e.lastSeen)+'</td><td>'+riskPill(risk)+'</td><td><div class="sigs">'+sigBadges(e)+'</div></td><td style="text-align:center">'+(lc>0?'<span class="badge b-accent">'+lc+'</span>':'<span class="badge b-muted">\u2014</span>')+'</td><td style="text-align:center"><span class="badge b-brand">'+(e.visitCount||1)+'</span></td></tr>';
+  }).join('')||'<tr><td colspan="8" class="loading">No identities</td></tr>';
+}
+
+async function loadDevelopers(){
+  try{
+    var res=await fetch(API+'/stats',{headers:{'x-api-key':KEY}});
+    var s=await res.json();
+    document.getElementById('keys-tbody').innerHTML=(s.apiKeys||[]).map(function(k){return '<tr><td style="font-weight:600;color:var(--text)">'+esc(k.name)+'</td><td><span class="mono" style="color:var(--brand)">'+esc(k.key)+'</span></td><td>'+(k.isActive?'<span class="badge b-ok">Active</span>':'<span class="badge b-muted">Off</span>')+'</td><td class="mono" style="color:var(--muted)">'+new Date(k.createdAt).toLocaleDateString()+'</td></tr>';}).join('')||'<tr><td colspan="4" class="loading">No keys</td></tr>';
+  }catch(e){}
+}
+
+async function openVisitor(vid){
+  document.getElementById('so-vid').textContent=vid;
+  document.getElementById('so-body').innerHTML='<div class="loading"><div class="spin"></div></div>';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('slideout').classList.add('open');
+  try{
+    var res=await fetch(API+'/v1/visitor/'+encodeURIComponent(vid),{headers:{'x-api-key':KEY}});
+    if(!res.ok)throw new Error('not found');
+    var v=await res.json();renderDetail(v);
+  }catch(e){
+    var local=allEvents.find(function(ev){return ev.visitorId===vid;});
+    if(local)renderFallback(local);
+    else document.getElementById('so-body').innerHTML='<div class="loading">Could not load profile.</div>';
   }
+}
 
-  // ── Data fetch ──
-  async function loadDashboard() {
-    try {
-      const res = await fetch(`${API}/v1/dashboard`, { headers: { 'x-api-key': KEY } });
-      if (!res.ok) {
-        console.error('Dashboard HTTP error:', res.status);
-        document.getElementById('lastRefresh').textContent = 'Error: HTTP ' + res.status;
-        return;
-      }
-      data = await res.json();
-      if (data.error) {
-        console.error('Dashboard API error:', data.error, data.details);
-        document.getElementById('lastRefresh').textContent = 'Error: ' + data.error;
-        return;
-      }
-      allEvents = data.allEvents || data.riskyEvents || [];
-      // Per-visit event log from the events table
-      eventLogEntries = (data.eventLog || []).map(e => {
-        const ed = e.eventData || {};
-        return {
-          visitorId: e.visitorId,
-          merchantName: e.merchantName || '—',
-          ipAddress: e.ipAddress,
-          matchTier: ed.matchTier || '—',
-          riskScore: ed.riskScore || 0,
-          isVpn: ed.isVpn || false,
-          isNew: ed.isNew || false,
-          signalsCollected: ed.signalsCollected || 0,
-          createdAt: e.createdAt,
-        };
-      });
-      const map = new Map();
-      allEvents.forEach(e => { if (!map.has(e.visitorId)) map.set(e.visitorId, e); });
-      uniqIdentities = [...map.values()];
+function renderDetail(v){
+  var risk=calcRisk({isVpn:v.isVpn,isIncognito:v.isIncognito,headlessScore:v.headlessScore,botScore:v.botScore,visitCount:v.visitCount});
+  var groups=v.signalGroups||[];
+  var linked=v.linkedDevices||[];
+  document.getElementById('so-body').innerHTML=
+    '<div class="so-sec"><div class="so-sec-title">Risk</div><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+riskPill(risk,true)+'<div class="sigs">'+sigBadges({isVpn:v.isVpn,isIncognito:v.isIncognito,headlessScore:v.headlessScore,botScore:v.botScore})+'</div></div>'+
+    '<div class="dr"><span class="dk">IP</span><span class="dv">'+esc(v.ipAddress||'\u2014')+'</span></div>'+
+    '<div class="dr"><span class="dk">VPN</span><span>'+(v.isVpn?'<span class="badge b-danger">Yes</span>':'<span class="badge b-ok">No</span>')+'</span></div>'+
+    '<div class="dr"><span class="dk">Incognito</span><span>'+(v.isIncognito?'<span class="badge b-warn">Yes</span>':'<span class="badge b-ok">No</span>')+'</span></div>'+
+    '<div class="dr"><span class="dk">Headless</span><span class="dv">'+(v.headlessScore||0)+'%</span></div>'+
+    '<div class="dr"><span class="dk">Bot signals</span><span class="dv">'+(v.botScore||0)+'</span></div></div>'+
+    '<div class="so-sec"><div class="so-sec-title">Signals <span class="so-sec-count">'+(groups.length||7)+' groups</span></div>'+
+    (groups.length>0?groups.map(function(g){var d=SG.find(function(x){return x.key===g.name.toLowerCase();})||{};return '<div class="sg-card"><div class="sg-head"><div class="sg-icon '+(d.icon||'cpu')+'">'+sgIcon(d.icon||'cpu')+'</div><div class="sg-name">'+esc(g.name)+'</div><div class="sg-hash">'+(g.hash?g.hash.substring(0,14)+'\u2026':'\u2014')+'</div></div><div class="sg-signals">'+(g.signals||[]).map(function(s){return '<div class="sg-sig active">'+esc(s)+'</div>';}).join('')+'</div></div>';}).join(''):SG.map(function(g){return '<div class="sg-card"><div class="sg-head"><div class="sg-icon '+g.icon+'">'+sgIcon(g.icon)+'</div><div class="sg-name">'+g.name+'</div><span style="font-size:9px;color:var(--muted)">'+g.signals.length+'</span></div></div>';}).join(''))+
+    '</div>'+
+    '<div class="so-sec"><div class="so-sec-title">History</div>'+
+    '<div class="dr"><span class="dk">First seen</span><span class="dv">'+(v.firstSeen?new Date(v.firstSeen).toLocaleString():'\u2014')+'</span></div>'+
+    '<div class="dr"><span class="dk">Last seen</span><span class="dv">'+(v.lastSeen?new Date(v.lastSeen).toLocaleString():'\u2014')+'</span></div>'+
+    '<div class="dr"><span class="dk">Visits</span><span class="dv">'+(v.visitCount||'\u2014')+'</span></div></div>'+
+    '<div class="so-sec"><div class="so-sec-title">Identity <span class="so-sec-count">'+linked.length+' linked</span></div>'+
+    (linked.length>0?linked.map(function(l){return '<div class="dr" style="padding:8px 0"><div><span class="mono" style="color:var(--brand);cursor:pointer" onclick="openVisitor(\''+esc(l.linkedId)+'\')">'+esc((l.linkedId||'').substring(0,20))+'\u2026</span><div style="margin-top:2px"><span class="badge b-accent">'+esc(l.linkType||'linked')+'</span></div></div><div style="text-align:right">'+riskPill(Math.round((l.confidence||0)*100))+'</div></div>';}).join(''):'<div style="color:var(--muted);font-size:11px;padding:4px 0">No linked devices</div>')+
+    '</div>';
+}
 
-      const hrCount = allEvents.filter(e => isHighRisk(e)).length;
-      const badge = document.getElementById('riskBadge');
-      badge.textContent = hrCount;
-      badge.classList.toggle('show', hrCount > 0);
+function renderFallback(e){
+  var risk=calcRisk(e);
+  document.getElementById('so-body').innerHTML=
+    '<div class="so-sec"><div class="so-sec-title">Risk</div><div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+riskPill(risk,true)+'<div class="sigs">'+sigBadges(e)+'</div></div>'+
+    '<div class="dr"><span class="dk">IP</span><span class="dv">'+esc(e.ipAddress||'\u2014')+'</span></div>'+
+    '<div class="dr"><span class="dk">VPN</span><span>'+(e.isVpn?'<span class="badge b-danger">Yes</span>':'<span class="badge b-ok">No</span>')+'</span></div>'+
+    '<div class="dr"><span class="dk">Visits</span><span class="dv">'+(e.visitCount||1)+'</span></div></div>'+
+    '<div class="so-sec"><div class="so-sec-title">Signals</div>'+
+    SG.map(function(g){return '<div class="sg-card"><div class="sg-head"><div class="sg-icon '+g.icon+'">'+sgIcon(g.icon)+'</div><div class="sg-name">'+g.name+'</div></div></div>';}).join('')+'</div>';
+}
 
-      renderOverview();
-      renderEvents();
-      renderIdentities();
-      document.getElementById('lastRefresh').textContent =
-        'Refreshed ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch(e) {
-      console.error('Dashboard load failed:', e);
-      document.getElementById('lastRefresh').textContent = 'Error: ' + e.message;
-    }
-  }
+function closeSlideout(){document.getElementById('overlay').classList.remove('open');document.getElementById('slideout').classList.remove('open');}
 
-  // ── Overview ──
-  function renderOverview() {
-    if (!data) return;
-    const ov = data.overview;
-    const hrRate = ov.events_24h > 0 ? ((ov.high_risk_24h / ov.events_24h) * 100).toFixed(1) : '0.0';
-    const avgRisk = allEvents.length
-      ? Math.round(allEvents.reduce((s, e) => s + calcRisk(e), 0) / allEvents.length)
-      : 0;
+function sgIcon(t){
+  var i={
+    render:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v12H2z" opacity=".25"/><path d="M4 6l4-3 4 3v6H4z"/></svg>',
+    gpu:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="4" width="12" height="8" rx="1"/><path d="M5 1v3M8 1v3M11 1v3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>',
+    audio:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v14M5 4v8M2 6v4M11 4v8M14 6v4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>',
+    display:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 14h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    type:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v2H9v8H7V5H3z"/></svg>',
+    browser:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12" fill="none" stroke="currentColor" stroke-width="1"/></svg>',
+    cpu:'<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 1v3M10 1v3M6 12v3M10 12v3M1 6h3M1 10h3M12 6h3M12 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>',
+  };
+  return i[t]||i.cpu;
+}
 
-    setKpi('kpi-events', ov.events_24h.toLocaleString(), null);
-    document.getElementById('kpi-events-d').textContent = `Last 24 hours`;
-    setKpi('kpi-visitors', ov.unique_devices_24h.toLocaleString(), null);
-    document.getElementById('kpi-visitors-d').textContent = `${ov.new_devices_24h} new today`;
-    setKpi('kpi-new', ov.new_devices_24h.toLocaleString(), null);
-    setKpi('kpi-risk', hrRate + '%', parseFloat(hrRate) >= 15 ? 'danger' : parseFloat(hrRate) >= 5 ? 'warn' : 'ok');
-    document.getElementById('kpi-risk-d').textContent = `${ov.high_risk_24h} flagged events`;
-    setKpi('kpi-avgrisk', avgRisk, avgRisk >= 40 ? 'danger' : avgRisk >= 20 ? 'warn' : 'ok');
-    document.getElementById('kpi-avgrisk-d').textContent = avgRisk >= 40 ? 'Elevated' : avgRisk >= 20 ? 'Moderate' : 'Healthy';
+function isHR(e){return e.isVpn||e.isIncognito||(e.headlessScore||0)>=40||(e.botScore||0)>=2;}
+function calcRisk(e){var s=0;if(!e.visitCount||e.visitCount<=1)s+=15;if(e.isVpn)s+=25;if(e.isIncognito)s+=20;if((e.headlessScore||0)>=40)s+=30;if((e.botScore||0)>=2)s+=35;return Math.min(100,Math.max(0,s));}
+function riskPill(s,lg){var c=s>=40?'rp-high':s>=20?'rp-med':'rp-low';return '<span class="rpill '+c+'"'+(lg?' style="font-size:13px;padding:4px 12px"':'')+'>'+s+'</span>';}
+function sigBadges(e){var o='';if(e.isVpn)o+='<span class="badge b-danger">VPN</span>';if(e.isIncognito)o+='<span class="badge b-warn">Incognito</span>';if((e.headlessScore||0)>=40)o+='<span class="badge b-danger">Headless</span>';if((e.botScore||0)>=2)o+='<span class="badge b-danger">Bot</span>';return o||'<span class="badge b-ok">Clean</span>';}
+function fmtDate(d){return d?new Date(d).toLocaleString('en-GB',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'\u2014';}
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+function copyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent).catch(function(){});}
 
-    // Identity linking KPIs
-    setKpi('kpi-linked', (ov.linked_identities || 0).toLocaleString(), null);
-    document.getElementById('kpi-linked-d').textContent = 'Cross-device linked visitors';
-    setKpi('kpi-vpn', (ov.vpn_24h || 0).toLocaleString(), null);
-    document.getElementById('kpi-vpn-d').textContent = 'VPN/proxy sessions today';
-    setKpi('kpi-incog', (ov.incognito_24h || 0).toLocaleString(), null);
-    document.getElementById('kpi-incog-d').textContent = 'Private browsing sessions';
-
-    try { renderChart(); } catch(ce) { console.error('Chart error:', ce); }
-    renderSignalCoverage();
-    renderMerchants();
-  }
-
-  function setKpi(id, value, colorKey) {
-    const el = document.getElementById(id);
-    el.textContent = value;
-    if (colorKey) {
-      const colors = { ok: 'var(--ok)', warn: 'var(--warn)', danger: 'var(--danger)' };
-      el.style.color = colors[colorKey] || '';
-    }
-  }
-
-  function renderChart() {
-    const hourly = data.hourly || [];
-    const labels = hourly.map(h => new Date(h.hour).getHours().toString().padStart(2,'0') + ':00');
-    const trusted = hourly.map(h => h.trusted !== undefined ? h.trusted : Math.max(0, (h.events||0) - (h.highRisk||0)));
-    const highRisk = hourly.map(h => h.highRisk !== undefined ? h.highRisk : 0);
-    const ctx = document.getElementById('trendChart').getContext('2d');
-    if (trendChart) trendChart.destroy();
-    trendChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Trusted', data: trusted, backgroundColor: 'rgba(16,185,129,0.5)', borderColor: 'rgba(16,185,129,0.7)', borderWidth: 1, borderRadius: 3, stack: 's' },
-          { label: 'High Risk', data: highRisk, backgroundColor: 'rgba(239,68,68,0.5)', borderColor: 'rgba(239,68,68,0.7)', borderWidth: 1, borderRadius: 3, stack: 's' },
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top', labels: { color: '#64748b', font: { size: 11, family: 'Inter' }, boxWidth: 10, padding: 14 } },
-          tooltip: { backgroundColor: '#0f1219', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10 },
-        },
-        scales: {
-          x: { stacked: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 }, precision: 0 } },
-        },
-      },
-    });
-  }
-
-  function renderSignalCoverage() {
-    // Show the 7 signal groups + 3 volatile analysis signals
-    const html = `
-      <div style="margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:11px;font-weight:600;color:var(--text-2)">Matching Groups</span>
-          <span style="font-size:10px;color:var(--muted)">7 groups &middot; 19 signals</span>
-        </div>
-        ${SIGNAL_GROUPS.map(g => `
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-            <div style="width:8px;height:8px;border-radius:2px;background:${g.color};flex-shrink:0"></div>
-            <span style="font-size:11px;font-weight:600;flex:1">${g.name}</span>
-            <span style="font-size:10px;color:var(--muted)">${g.signals.length} signal${g.signals.length > 1 ? 's' : ''}</span>
-          </div>
-        `).join('')}
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:11px;font-weight:600;color:var(--text-2)">Analysis-Only Signals</span>
-          <span style="font-size:10px;color:var(--muted)">3 volatile</span>
-        </div>
-        ${VOLATILE_SIGNALS.map(s => `
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-            <div style="width:8px;height:8px;border-radius:2px;background:var(--muted);flex-shrink:0;opacity:0.5"></div>
-            <span style="font-size:11px;flex:1">${s.name}</span>
-            <span style="font-size:10px;color:var(--muted)" title="${esc(s.desc)}">analysis</span>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    document.getElementById('signal-coverage-body').innerHTML = html;
-  }
-
-  function renderMerchants() {
-    const merchants = data.merchants || [];
-    document.getElementById('merchant-count').textContent = merchants.length + ' active';
-    document.getElementById('merchants-tbody').innerHTML = merchants.map(m => {
-      const rr = m.events24h > 0 ? ((m.highRisk24h / m.events24h) * 100).toFixed(1) : '0.0';
-      const cls = parseFloat(rr) >= 15 ? 'c-danger' : parseFloat(rr) >= 5 ? 'c-warn' : 'c-ok';
-      return `<tr>
-        <td style="font-weight:600">${esc(m.name)}</td>
-        <td><span class="mono">${esc(m.publicKey)}</span></td>
-        <td>${m.events24h}</td>
-        <td>${m.uniqueDevices24h}</td>
-        <td>${m.highRisk24h}</td>
-        <td><span class="${cls}" style="font-weight:700">${rr}%</span></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="6" class="loading">No merchant data</td></tr>';
-
-    // Populate merchant filter
-    const sel = document.getElementById('evtMerchant');
-    const cur = sel.value;
-    while (sel.options.length > 1) sel.remove(1);
-    merchants.forEach(m => {
-      const o = document.createElement('option');
-      o.value = m.publicKey;
-      o.textContent = m.name;
-      sel.appendChild(o);
-    });
-    sel.value = cur;
-  }
-
-  // ── Events ──
-  function applyFilter() {
-    const s = document.getElementById('evtSearch').value.toLowerCase();
-    const m = document.getElementById('evtMerchant').value;
-    const r = document.getElementById('evtRisk').value;
-    let evs = eventLogEntries;
-    if (s) evs = evs.filter(e => (e.visitorId||'').toLowerCase().includes(s) || (e.ipAddress||'').includes(s) || (e.merchantName||'').toLowerCase().includes(s));
-    if (m) evs = evs.filter(e => e.publicKey === m);
-    if (r === 'high') evs = evs.filter(e => e.riskScore >= 40);
-    if (r === 'clean') evs = evs.filter(e => e.riskScore < 40);
-    renderEventsRows(evs);
-  }
-  function renderEvents() { applyFilter(); }
-
-  function renderEventsRows(evs) {
-    document.getElementById('evts-count').textContent = evs.length + ' events';
-    document.getElementById('events-tbody').innerHTML = evs.map(e => {
-      const risk = e.riskScore;
-      const tierColors = { exact: 'var(--ok)', fuzzy: 'var(--warn)', 'cross-device': 'var(--accent)', 'new': 'var(--brand)' };
-      const tierColor = tierColors[e.matchTier] || 'var(--muted)';
-      return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
-        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.createdAt)}</td>
-        <td><span class="mono" style="color:var(--brand)">${esc((e.visitorId||'').substring(0,20))}…</span></td>
-        <td>${esc(e.merchantName||'—')}</td>
-        <td><span class="badge" style="background:${tierColor};color:#fff">${esc(e.matchTier)}</span></td>
-        <td>${riskPill(risk)}</td>
-        <td class="mono" style="font-size:11px">${esc(e.ipAddress||'—')}</td>
-        <td><span class="badge b-muted">${e.signalsCollected}/${22}</span>${e.isVpn ? ' <span class=\"badge b-danger\">VPN</span>' : ''}</td>
-        <td style="text-align:center">${e.isNew ? '<span class="badge b-brand">NEW</span>' : '<span class="badge b-muted">—</span>'}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="8" class="loading">No events match</td></tr>';
-  }
-
-  // ── Identities ──
-  function applyIdFilter() {
-    const s = document.getElementById('idSearch').value.toLowerCase();
-    const r = document.getElementById('idRisk').value;
-    let ids = uniqIdentities;
-    if (s) ids = ids.filter(e => (e.visitorId||'').toLowerCase().includes(s) || (e.ipAddress||'').includes(s));
-    if (r === 'high') ids = ids.filter(e => isHighRisk(e));
-    renderIdentitiesRows(ids);
-  }
-  function renderIdentities() { applyIdFilter(); }
-
-  function renderIdentitiesRows(ids) {
-    document.getElementById('ids-count').textContent = ids.length + ' identities';
-    document.getElementById('identities-tbody').innerHTML = ids.map(e => {
-      const risk = calcRisk(e);
-      const lc = e.linkedCount || 0;
-      const linkBadge = lc > 0
-        ? `<span class="badge b-accent" title="${lc} linked device(s)">&#x1F517; ${lc}</span>`
-        : '<span class="badge b-muted">Solo</span>';
-      return `<tr class="clk" onclick="openVisitor('${esc(e.visitorId)}')">
-        <td><span class="mono" style="color:var(--brand)">${esc(e.visitorId||'—')}</span></td>
-        <td>${esc(e.merchantName||'—')}</td>
-        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.firstSeen||e.lastSeen)}</td>
-        <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(e.lastSeen)}</td>
-        <td>${riskPill(risk)}</td>
-        <td><div class="sigs">${sigBadges(e)}</div></td>
-        <td style="text-align:center">${linkBadge}</td>
-        <td style="text-align:center"><span class="badge b-brand">${e.visitCount||1}</span></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="8" class="loading">No identities found</td></tr>';
-  }
-
-  // ── Developers ──
-  async function loadDevelopers() {
-    try {
-      const res = await fetch(`${API}/stats`, { headers: { 'x-api-key': KEY } });
-      const stats = await res.json();
-      document.getElementById('keys-tbody').innerHTML = (stats.apiKeys || []).map(k => `
-        <tr>
-          <td style="font-weight:600">${esc(k.name)}</td>
-          <td><span class="mono" style="color:var(--brand)">${esc(k.key)}</span></td>
-          <td>${k.isActive ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-muted">Inactive</span>'}</td>
-          <td class="mono" style="color:var(--muted)">${new Date(k.createdAt).toLocaleDateString()}</td>
-        </tr>`).join('') || '<tr><td colspan="4" class="loading">No keys</td></tr>';
-    } catch(e) {}
-  }
-
-  // ── Visitor slide-out ──
-  async function openVisitor(visitorId) {
-    document.getElementById('so-vid').textContent = visitorId;
-    document.getElementById('so-body').innerHTML = '<div class="loading"><div class="spin"></div></div>';
-    document.getElementById('overlay').classList.add('open');
-    document.getElementById('slideout').classList.add('open');
-
-    try {
-      const res = await fetch(`${API}/v1/visitor/${encodeURIComponent(visitorId)}`, { headers: { 'x-api-key': KEY } });
-      if (!res.ok) throw new Error('not found');
-      const v = await res.json();
-      renderVisitorDetail(v);
-    } catch(e) {
-      const local = allEvents.find(ev => ev.visitorId === visitorId);
-      if (local) renderVisitorFallback(local);
-      else document.getElementById('so-body').innerHTML = '<div class="loading">Could not load visitor profile.</div>';
-    }
-  }
-
-  function renderVisitorDetail(v) {
-    const risk = calcRisk({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore, visitCount: v.visitCount });
-    const groups = v.signalGroups || [];
-    const linked = v.linkedDevices || [];
-
-    document.getElementById('so-body').innerHTML = `
-      <!-- Risk Assessment -->
-      <div class="so-sec">
-        <div class="so-sec-title">Risk Assessment</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          ${riskPill(risk, true)}
-          <div class="sigs">${sigBadges({ isVpn: v.isVpn, isIncognito: v.isIncognito, headlessScore: v.headlessScore, botScore: v.botScore })}</div>
-        </div>
-        <div class="dr"><span class="dk">IP Address</span><span class="dv">${esc(v.ipAddress||'—')}</span></div>
-        <div class="dr"><span class="dk">VPN / Proxy</span><span>${v.isVpn ? '<span class="badge b-danger">Detected</span>' : '<span class="badge b-ok">None</span>'}</span></div>
-        <div class="dr"><span class="dk">Incognito</span><span>${v.isIncognito ? '<span class="badge b-warn">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
-        <div class="dr"><span class="dk">Headless Score</span><span class="dv">${v.headlessScore || 0}%</span></div>
-        <div class="dr"><span class="dk">Bot Signals</span><span class="dv">${v.botScore || 0} detected</span></div>
-      </div>
-
-      <!-- Signal Groups (22 signals in 7 groups) -->
-      <div class="so-sec">
-        <div class="so-sec-title">
-          Signal Groups
-          <span class="so-sec-count">${groups.length} groups &middot; 22 signals</span>
-        </div>
-        ${groups.length > 0 ? groups.map(g => {
-          const def = SIGNAL_GROUPS.find(d => d.key === g.name.toLowerCase()) || {};
-          return `
-          <div class="sg-card">
-            <div class="sg-head">
-              <div class="sg-icon ${def.icon || 'cpu'}">${sgIconSvg(def.icon || 'cpu')}</div>
-              <div class="sg-name">${esc(g.name)}</div>
-              <div class="sg-hash" title="${esc(g.hash || '')}">${g.hash ? g.hash.substring(0, 16) + '…' : '—'}</div>
-            </div>
-            <div class="sg-signals">
-              ${(g.signals || []).map(s => `<div class="sg-sig active">${esc(s)}</div>`).join('')}
-            </div>
-          </div>`;
-        }).join('') : `
-          ${SIGNAL_GROUPS.map(g => `
-          <div class="sg-card">
-            <div class="sg-head">
-              <div class="sg-icon ${g.icon}">${sgIconSvg(g.icon)}</div>
-              <div class="sg-name">${g.name}</div>
-              <div style="font-size:10px;color:var(--muted)">—</div>
-            </div>
-            <div class="sg-signals">
-              ${g.signals.map(s => `<div class="sg-sig">${esc(s)}</div>`).join('')}
-            </div>
-          </div>`).join('')}
-        `}
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em">Analysis-Only (volatile)</div>
-          ${VOLATILE_SIGNALS.map(s => `
-            <div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11px;color:var(--text-2)">
-              <div style="width:4px;height:4px;border-radius:50%;background:var(--muted);opacity:0.5;flex-shrink:0"></div>
-              ${s.name} <span style="color:var(--muted);font-size:10px;margin-left:auto">${s.desc.split('—')[0].trim()}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <!-- Visit History -->
-      <div class="so-sec">
-        <div class="so-sec-title">Visit History</div>
-        <div class="dr"><span class="dk">First Seen</span><span class="dv">${v.firstSeen ? new Date(v.firstSeen).toLocaleString() : '—'}</span></div>
-        <div class="dr"><span class="dk">Last Seen</span><span class="dv">${v.lastSeen ? new Date(v.lastSeen).toLocaleString() : '—'}</span></div>
-        <div class="dr"><span class="dk">Total Visits</span><span class="dv">${v.visitCount || '—'}</span></div>
-        <div class="dr"><span class="dk">Merchant</span><span class="dv">${esc(v.merchantName || '—')}</span></div>
-      </div>
-
-      <!-- Linked Devices / Identity Graph -->
-      <div class="so-sec">
-        <div class="so-sec-title">Identity Graph <span class="so-sec-count">${linked.length} linked</span></div>
-        ${linked.length > 0 ? `
-          <div style="background:var(--accent-dim);border:1px solid rgba(129,140,248,0.15);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-            <span style="font-size:16px">&#x1F517;</span>
-            <div>
-              <div style="font-size:12px;font-weight:600;color:var(--accent)">Same Person · ${linked.length} Device${linked.length > 1 ? 's' : ''} Linked</div>
-              <div style="font-size:10px;color:var(--muted)">Cross-device identity resolution active</div>
-            </div>
-          </div>
-          ${linked.map(l => `
-          <div class="dr" style="padding:9px 0">
-            <div>
-              <span class="mono" style="color:var(--brand);font-size:11px;cursor:pointer" onclick="openVisitor('${esc(l.linkedId)}')">${esc((l.linkedId||'').substring(0,22))}…</span>
-              <div style="margin-top:3px">
-                <span class="badge ${l.linkType === 'same_network' ? 'b-brand' : l.linkType === 'stored_id' ? 'b-ok' : 'b-accent'}">${esc(l.linkType === 'same_network' ? '📡 Same Network' : l.linkType === 'stored_id' ? '🔑 Stored ID' : '🔗 Signal Overlap')}</span>
-              </div>
-            </div>
-            <div style="text-align:right">
-              ${riskPill(Math.round((l.confidence||0)*100))}
-              <div style="font-size:10px;color:var(--muted);margin-top:2px">${l.linkedAt ? new Date(l.linkedAt).toLocaleDateString() : ''}</div>
-            </div>
-          </div>`).join('')}
-        ` : '<div style="color:var(--muted);font-size:12px;padding:4px 0">No linked devices — single device identity</div>'}
-      </div>
-    `;
-  }
-
-  function renderVisitorFallback(e) {
-    const risk = calcRisk(e);
-    document.getElementById('so-body').innerHTML = `
-      <div class="so-sec">
-        <div class="so-sec-title">Risk Assessment</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-          ${riskPill(risk, true)}
-          <div class="sigs">${sigBadges(e)}</div>
-        </div>
-        <div class="dr"><span class="dk">IP Address</span><span class="dv">${esc(e.ipAddress||'—')}</span></div>
-        <div class="dr"><span class="dk">VPN</span><span>${e.isVpn ? '<span class="badge b-danger">Detected</span>' : '<span class="badge b-ok">None</span>'}</span></div>
-        <div class="dr"><span class="dk">Incognito</span><span>${e.isIncognito ? '<span class="badge b-warn">Yes</span>' : '<span class="badge b-ok">No</span>'}</span></div>
-        <div class="dr"><span class="dk">Last Seen</span><span class="dv">${new Date(e.lastSeen).toLocaleString()}</span></div>
-        <div class="dr"><span class="dk">Visits</span><span class="dv">${e.visitCount||1}</span></div>
-      </div>
-      <div class="so-sec">
-        <div class="so-sec-title">Signal Groups <span class="so-sec-count">22 signals</span></div>
-        ${SIGNAL_GROUPS.map(g => `
-        <div class="sg-card">
-          <div class="sg-head">
-            <div class="sg-icon ${g.icon}">${sgIconSvg(g.icon)}</div>
-            <div class="sg-name">${g.name}</div>
-            <span style="font-size:10px;color:var(--muted)">${g.signals.length} signals</span>
-          </div>
-          <div class="sg-signals">
-            ${g.signals.map(s => `<div class="sg-sig">${esc(s)}</div>`).join('')}
-          </div>
-        </div>`).join('')}
-      </div>
-    `;
-  }
-
-  function closeSlideout() {
-    document.getElementById('overlay').classList.remove('open');
-    document.getElementById('slideout').classList.remove('open');
-  }
-
-  // ── Signal group icons ──
-  function sgIconSvg(type) {
-    const icons = {
-      render:  '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v12H2z" opacity=".3"/><path d="M4 6l4-3 4 3v6H4z"/></svg>',
-      gpu:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="4" width="12" height="8" rx="1"/><path d="M5 1v3M8 1v3M11 1v3" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>',
-      audio:   '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v14M5 4v8M2 6v4M11 4v8M14 6v4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>',
-      display: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 14h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-      type:    '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 3h10v2H9v8H7V5H3z"/></svg>',
-      browser: '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12" fill="none" stroke="currentColor" stroke-width="1"/></svg>',
-      cpu:     '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 1v3M10 1v3M6 12v3M10 12v3M1 6h3M1 10h3M12 6h3M12 10h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>',
-    };
-    return icons[type] || icons.cpu;
-  }
-
-  // ── Helpers ──
-  function isHighRisk(e) {
-    return e.isVpn || e.isIncognito || (e.headlessScore||0) >= 40 || (e.botScore||0) >= 2;
-  }
-
-  function calcRisk(e) {
-    let s = 0;
-    if (!e.visitCount || e.visitCount <= 1) s += 15;
-    if (e.isVpn)                             s += 25;
-    if (e.isIncognito)                       s += 20;
-    if ((e.headlessScore||0) >= 40)          s += 30;
-    if ((e.botScore||0) >= 2)                s += 35;
-    return Math.min(100, Math.max(0, s));
-  }
-
-  function riskPill(score, large) {
-    const cls = score >= 40 ? 'rp-high' : score >= 20 ? 'rp-med' : 'rp-low';
-    const style = large ? 'font-size:15px;padding:5px 14px' : '';
-    return `<span class="rpill ${cls}" style="${style}">${score}</span>`;
-  }
-
-  function sigBadges(e) {
-    let out = '';
-    if (e.isVpn) out += '<span class="badge b-danger">VPN</span>';
-    if (e.isIncognito) out += '<span class="badge b-warn">Incognito</span>';
-    if ((e.headlessScore||0) >= 40) out += '<span class="badge b-danger">Headless</span>';
-    if ((e.botScore||0) >= 2) out += '<span class="badge b-danger">Bot</span>';
-    if (!out) out = '<span class="badge b-ok">Clean</span>';
-    return out;
-  }
-
-  function fmtDate(d) {
-    if (!d) return '—';
-    return new Date(d).toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function copyEl(id) {
-    navigator.clipboard.writeText(document.getElementById(id).textContent).catch(() => {});
-  }
-
-  // ── Boot ──
-  loadDashboard();
-  setInterval(loadDashboard, 30000);
+loadDashboard();
+setInterval(loadDashboard,30000);
 </script>
 </body>
 </html>
