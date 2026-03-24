@@ -319,9 +319,9 @@ app.get('/v1/dashboard', async (c) => {
   const db = c.get('db') as any;
   const apiKey = c.get('apiKey') as any;
 
-  // Restrict portfolio-wide monitoring to Wayl operator keys.
-  if (!apiKey?.public_key || !String(apiKey.public_key).startsWith('pk_live_wayl')) {
-    return c.json({ error: 'Dashboard access is restricted to Wayl operator keys.' }, 403);
+  // Restrict portfolio-wide monitoring to Athar operator keys.
+  if (!apiKey?.public_key || !String(apiKey.public_key).startsWith('pk_live_athar')) {
+    return c.json({ error: 'Dashboard access is restricted to Athar operator keys.' }, 403);
   }
 
   try {
@@ -574,8 +574,8 @@ app.get('/v1/visitor/:id', async (c) => {
   const apiKey = c.get('apiKey') as any;
   const visitorId = c.req.param('id');
 
-  if (!apiKey?.public_key || !String(apiKey.public_key).startsWith('pk_live_wayl')) {
-    return c.json({ error: 'Restricted to Wayl operator keys.' }, 403);
+  if (!apiKey?.public_key || !String(apiKey.public_key).startsWith('pk_live_athar')) {
+    return c.json({ error: 'Restricted to Athar operator keys.' }, 403);
   }
 
   try {

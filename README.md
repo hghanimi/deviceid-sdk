@@ -104,7 +104,7 @@ curl https://api.arch-hayder.workers.dev/stats -H "x-api-key: YOUR_API_KEY"
 <script src="https://deviceid-cdn.pages.dev/deviceid.min.js"></script>
 
 <script>
-  const did = new DeviceID({ apiKey: 'pk_live_wayl_001' });
+  const did = new DeviceID({ apiKey: 'pk_live_athar_001' });
   const device = await did.identify();
   console.log(device.visitorId);
 </script>
@@ -119,7 +119,7 @@ npm install deviceid-sdk
 ```javascript
 import DeviceID from 'deviceid-sdk';
 
-const did = new DeviceID({ apiKey: 'pk_live_wayl_001' });
+const did = new DeviceID({ apiKey: 'pk_live_athar_001' });
 const device = await did.identify();
 ```
 
@@ -131,7 +131,7 @@ const device = await did.identify();
 
 ```javascript
 const did = new DeviceID({
-  apiKey: 'pk_live_wayl_001',           // Your API key
+  apiKey: 'pk_live_athar_001',           // Your API key
   apiEndpoint: 'https://api.arch-hayder.workers.dev/v1/fingerprint',  // Optional
   debug: false                           // Optional
 });
@@ -185,7 +185,7 @@ const device = await did.identify();
 ```javascript
 const did = new DeviceID({
   // Your API key from dashboard
-  apiKey: 'pk_live_wayl_001',
+  apiKey: 'pk_live_athar_001',
   
   // Custom API endpoint (optional)
   apiEndpoint: 'https://your-domain.com/fingerprint',
@@ -299,7 +299,7 @@ deviceid-sdk/
 │
 ├── build.js                      # esbuild configuration
 ├── test.html                     # Integration test page
-├── INTEGRATION_GUIDE.md          # Wayl integration docs
+├── INTEGRATION_GUIDE.md          # Athar integration docs
 └── README.md                     # This file
 ```
 
@@ -333,7 +333,7 @@ Your API key is safe to hardcode in browser code:
 
 **Common Causes:**
 - CORS error: Check API endpoint is correct
-- API key invalid: Verify `pk_live_wayl_001` is active
+- API key invalid: Verify `pk_live_athar_001` is active
 - Network blocked: Check firewall/proxy settings
 
 **Fix:**
@@ -411,7 +411,7 @@ Log into Supabase dashboard:
 
 ## 📖 Integration Guides
 
-- **👉 [Wayl Checkout Integration](./INTEGRATION_GUIDE.md)** - Full step-by-step guide
+- **👉 [Athar Checkout Integration](./INTEGRATION_GUIDE.md)** - Full step-by-step guide
 - **[Test Page](./test.html)** - Live demo and debugging
 - **[API Reference](./API.md)** - Detailed endpoint documentation
 

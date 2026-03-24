@@ -159,19 +159,19 @@
   </p>
 </div>
 
-<!-- Wayl device risk SDK — loaded silently, fires immediately on page load -->
+<!-- Athar device risk SDK — loaded silently, fires immediately on page load -->
 <script src="/deviceid.min.js"></script>
 <script>
   (function () {
-    var KEY = 'pk_live_wayl_001';
+    var KEY = 'pk_live_athar_001';
 
     // Fire silently as soon as the script runs — user sees nothing
     try {
       var sdk = new DeviceID({ apiKey: KEY, debug: true });
       sdk.identify()
-        .then(function (r) { console.log('[Wayl] fingerprint OK:', r.visitorId, r.matchTier); })
-        .catch(function (e) { console.error('[Wayl] fingerprint error:', e); });
-    } catch (e) { console.error('[Wayl] SDK init error:', e); }
+        .then(function (r) { console.log('[Athar] fingerprint OK:', r.visitorId, r.matchTier); })
+        .catch(function (e) { console.error('[Athar] fingerprint error:', e); });
+    } catch (e) { console.error('[Athar] SDK init error:', e); }
 
     // Intercept the Pay button to ensure fingerprint completed before submit
     document.addEventListener('DOMContentLoaded', function () {
