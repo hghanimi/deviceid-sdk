@@ -21,10 +21,14 @@ class DeviceID {
     this._cacheExp = 0;
   }
 
-  async identify() {
-    if (this._cache && Date.now() < this._cacheExp) return this._cache;
+  async identify(opts) {
+    opts = opts || {};
+    var cacheKey = opts.userId || '_default';
+    if (this._cache && this._cacheKey === cacheKey && Date.now() < this._cacheExp) return this._cache;
     try {
       var sig = await this.collectSignals();
+      if (opts.userId) sig.userId = opts.userId;
+      if (opts.linkedTag) sig.linkedTag = opts.linkedTag;
       if (this.debug) console.log('[Athar] signals:', sig);
       var r = await fetch(this.apiEndpoint, {
         method: 'POST',
@@ -35,6 +39,7 @@ class DeviceID {
       var res = await r.json();
       if (res.visitorId) this._persistId(res.visitorId);
       this._cache = res;
+      this._cacheKey = cacheKey;
       this._cacheExp = Date.now() + 300000;
       return res;
     } catch (e) {

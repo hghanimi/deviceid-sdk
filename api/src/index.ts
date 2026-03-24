@@ -28,6 +28,188 @@ const isPrivateIp = (ip?: string | null): boolean => {
   return false;
 };
 
+// ─── Cross-Device Person Resolution Engine ───
+async function resolvePersonIdentity(
+  db: any,
+  visitorId: string,
+  apiKeyId: string,
+  clientIp: string,
+  userId?: string,
+): Promise<{
+  personId: string | null;
+  linkedDevices: Array<{ visitorId: string; linkType: string; confidence: number }>;
+  isNewPerson: boolean;
+  linkType: string | null;
+}> {
+  let personId: string | null = null;
+  let isNewPerson = false;
+  let linkType: string | null = null;
+  const linkedDevices: Array<{ visitorId: string; linkType: string; confidence: number }> = [];
+
+  try {
+    // METHOD 1: Deterministic — userId from merchant login (99.9% accurate)
+    if (userId) {
+      const existingPerson = await db.query(
+        `SELECT person_id FROM persons
+         WHERE external_user_id = $1 AND api_key_id = $2
+         LIMIT 1`,
+        [userId, apiKeyId]
+      );
+
+      if (existingPerson.rows.length > 0) {
+        personId = existingPerson.rows[0].person_id;
+        const existingLink = await db.query(
+          `SELECT id FROM person_devices
+           WHERE person_id = $1 AND visitor_id = $2 AND api_key_id = $3
+           LIMIT 1`,
+          [personId, visitorId, apiKeyId]
+        );
+        if (existingLink.rows.length === 0) {
+          await db.query(
+            `INSERT INTO person_devices (person_id, visitor_id, link_type, confidence, ip_at_link, api_key_id)
+             VALUES ($1, $2, 'login', 1.0, $3, $4)`,
+            [personId, visitorId, clientIp, apiKeyId]
+          );
+          await db.query(
+            `UPDATE persons SET device_count = device_count + 1, last_seen = NOW()
+             WHERE person_id = $1`,
+            [personId]
+          );
+        } else {
+          await db.query(
+            `UPDATE persons SET last_seen = NOW() WHERE person_id = $1`,
+            [personId]
+          );
+        }
+        linkType = 'login';
+      } else {
+        personId = `psn_${nanoid(12)}`;
+        isNewPerson = true;
+        linkType = 'login';
+        await db.query(
+          `INSERT INTO persons (person_id, api_key_id, external_user_id, device_count)
+           VALUES ($1, $2, $3, 1)`,
+          [personId, apiKeyId, userId]
+        );
+        await db.query(
+          `INSERT INTO person_devices (person_id, visitor_id, link_type, confidence, ip_at_link, api_key_id)
+           VALUES ($1, $2, 'login', 1.0, $3, $4)`,
+          [personId, visitorId, clientIp, apiKeyId]
+        );
+      }
+    }
+
+    // METHOD 2: Probabilistic — IP correlation (70-85% accurate)
+    if (!personId && clientIp) {
+      const ipNeighbors = await db.query(
+        `SELECT DISTINCT f.visitor_id, f.person_id, pd.person_id as linked_person_id
+         FROM fingerprints f
+         LEFT JOIN person_devices pd ON pd.visitor_id = f.visitor_id AND pd.api_key_id = $3
+         WHERE f.ip_address = $1
+           AND f.api_key_id = $3
+           AND f.visitor_id != $2
+           AND f.last_seen >= NOW() - INTERVAL '30 minutes'
+         ORDER BY f.visitor_id
+         LIMIT 10`,
+        [clientIp, visitorId, apiKeyId]
+      );
+
+      if (ipNeighbors.rows.length > 0) {
+        const neighborWithPerson = ipNeighbors.rows.find(
+          (r: any) => r.person_id || r.linked_person_id
+        );
+
+        if (neighborWithPerson) {
+          personId = neighborWithPerson.person_id || neighborWithPerson.linked_person_id;
+          linkType = 'ip_correlation';
+          const alreadyLinked = await db.query(
+            `SELECT id FROM person_devices WHERE person_id = $1 AND visitor_id = $2 LIMIT 1`,
+            [personId, visitorId]
+          );
+          if (alreadyLinked.rows.length === 0) {
+            await db.query(
+              `INSERT INTO person_devices (person_id, visitor_id, link_type, confidence, ip_at_link, api_key_id)
+               VALUES ($1, $2, 'ip_correlation', 0.70, $3, $4)`,
+              [personId, visitorId, clientIp, apiKeyId]
+            );
+            await db.query(
+              `UPDATE persons SET device_count = device_count + 1, last_seen = NOW()
+               WHERE person_id = $1`,
+              [personId]
+            );
+          }
+        } else {
+          personId = `psn_${nanoid(12)}`;
+          isNewPerson = true;
+          linkType = 'ip_correlation';
+          await db.query(
+            `INSERT INTO persons (person_id, api_key_id, device_count)
+             VALUES ($1, $2, $3)`,
+            [personId, apiKeyId, ipNeighbors.rows.length + 1]
+          );
+          await db.query(
+            `INSERT INTO person_devices (person_id, visitor_id, link_type, confidence, ip_at_link, api_key_id)
+             VALUES ($1, $2, 'ip_correlation', 0.70, $3, $4)`,
+            [personId, visitorId, clientIp, apiKeyId]
+          );
+          for (const neighbor of ipNeighbors.rows) {
+            await db.query(
+              `INSERT INTO person_devices (person_id, visitor_id, link_type, confidence, ip_at_link, api_key_id)
+               VALUES ($1, $2, 'ip_correlation', 0.70, $3, $4)
+               ON CONFLICT DO NOTHING`,
+              [personId, neighbor.visitor_id, clientIp, apiKeyId]
+            );
+          }
+        }
+      }
+    }
+
+    // METHOD 3: Historical lookup — device was previously linked
+    if (!personId) {
+      const pastLink = await db.query(
+        `SELECT person_id, link_type FROM person_devices
+         WHERE visitor_id = $1 AND api_key_id = $2
+         ORDER BY linked_at DESC LIMIT 1`,
+        [visitorId, apiKeyId]
+      );
+      if (pastLink.rows.length > 0) {
+        personId = pastLink.rows[0].person_id;
+        linkType = pastLink.rows[0].link_type;
+        await db.query(
+          `UPDATE persons SET last_seen = NOW() WHERE person_id = $1`,
+          [personId]
+        );
+      }
+    }
+
+    // Update fingerprints table with person_id
+    if (personId) {
+      await db.query(
+        `UPDATE fingerprints SET person_id = $1
+         WHERE visitor_id = $2 AND api_key_id = $3 AND (person_id IS NULL OR person_id != $1)`,
+        [personId, visitorId, apiKeyId]
+      );
+      const allDevices = await db.query(
+        `SELECT visitor_id, link_type, confidence FROM person_devices
+         WHERE person_id = $1 AND visitor_id != $2
+         ORDER BY linked_at DESC`,
+        [personId, visitorId]
+      );
+      for (const d of allDevices.rows) {
+        linkedDevices.push({
+          visitorId: d.visitor_id,
+          linkType: d.link_type,
+          confidence: parseFloat(d.confidence),
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Person resolution error:', err);
+  }
+
+  return { personId, linkedDevices, isNewPerson, linkType };
+}
+
 app.use('*', cors());
 
 app.use('*', async (c, next) => {
@@ -41,8 +223,38 @@ app.use('*', async (c, next) => {
       ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS gpu_hash TEXT;
       ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS hw_only_hash TEXT;
       ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS fonts_only_hash TEXT;
+      ALTER TABLE fingerprints ADD COLUMN IF NOT EXISTS person_id VARCHAR(32);
     `);
   } catch (e) { /* columns already exist or non-fatal */ }
+  // Auto-migrate: person resolution tables
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS persons (
+        person_id VARCHAR(32) PRIMARY KEY,
+        api_key_id UUID NOT NULL REFERENCES api_keys(id),
+        external_user_id TEXT,
+        device_count INT DEFAULT 1,
+        first_seen TIMESTAMPTZ DEFAULT NOW(),
+        last_seen TIMESTAMPTZ DEFAULT NOW(),
+        metadata JSONB DEFAULT '{}'::jsonb
+      );
+      CREATE TABLE IF NOT EXISTS person_devices (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        person_id VARCHAR(32) NOT NULL REFERENCES persons(person_id),
+        visitor_id VARCHAR(32) NOT NULL,
+        link_type VARCHAR(20) NOT NULL,
+        confidence DECIMAL(3,2) NOT NULL,
+        ip_at_link TEXT,
+        linked_at TIMESTAMPTZ DEFAULT NOW(),
+        api_key_id UUID NOT NULL REFERENCES api_keys(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_persons_external_uid ON persons(external_user_id, api_key_id);
+      CREATE INDEX IF NOT EXISTS idx_person_devices_visitor ON person_devices(visitor_id, api_key_id);
+      CREATE INDEX IF NOT EXISTS idx_person_devices_person ON person_devices(person_id);
+      CREATE INDEX IF NOT EXISTS idx_fingerprints_person ON fingerprints(person_id);
+      CREATE INDEX IF NOT EXISTS idx_fingerprints_ip_recent ON fingerprints(ip_address, api_key_id, last_seen DESC);
+    `);
+  } catch (e) { /* tables already exist or non-fatal */ }
   c.set('db', client);
   await next();
   await client.end();
@@ -113,7 +325,7 @@ app.get('/v1/dashboard', async (c) => {
   }
 
   try {
-    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ, eventLogQ, uniquePersonsQ] = await Promise.all([
+    const [overview, merchants, riskyEvents, hourly, allEventsQ, linkedCountQ, eventLogQ, uniquePersonsQ, personsStatsQ] = await Promise.all([
       db.query(
         `SELECT
            COUNT(*)::int AS events_24h,
@@ -242,6 +454,14 @@ app.get('/v1/dashboard', async (c) => {
       db.query(
         `SELECT visitor_id_a, visitor_id_b FROM device_links`
       ).catch(() => ({ rows: [] })),
+      // Person resolution stats
+      db.query(
+        `SELECT COUNT(DISTINCT person_id)::int AS total_persons,
+                COUNT(*)::int AS total_person_devices
+         FROM person_devices
+         WHERE api_key_id = $1`,
+        [apiKey.id]
+      ).catch(() => ({ rows: [{ total_persons: 0, total_person_devices: 0 }] })),
     ]);
 
     // Build a map of visitor_id → link count
@@ -289,6 +509,8 @@ app.get('/v1/dashboard', async (c) => {
         }),
         linked_identities: linkMap.size,
         unique_persons: uniquePersons,
+        total_persons: personsStatsQ.rows[0]?.total_persons || 0,
+        total_person_devices: personsStatsQ.rows[0]?.total_person_devices || 0,
       },
       merchants: merchants.rows.map((row: any) => ({
         name: row.name,
@@ -1119,6 +1341,15 @@ app.post('/v1/fingerprint', async (c) => {
     if (isTor)                       riskScore += 25;   // Tor exit node
     riskScore = Math.min(100, Math.max(0, riskScore));
 
+    // ─── Cross-Device Person Resolution ───
+    const personResult = await resolvePersonIdentity(
+      db,
+      visitorId,
+      apiKeyId,
+      clientIp,
+      signals.userId || undefined,
+    );
+
     // ─── Log every visit to the events table (audit trail) ───
     try {
       await db.query(
@@ -1273,6 +1504,10 @@ app.post('/v1/fingerprint', async (c) => {
           confidence: l.confidence,
           linkedAt: l.created_at,
         })),
+        personId: personResult.personId,
+        personLinkType: personResult.linkType,
+        personDevices: personResult.linkedDevices,
+        isNewPerson: personResult.isNewPerson,
         previousIp: ipChanged ? previousIp : undefined,
         currentIp: clientIp,
       },
