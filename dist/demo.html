@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout – Secure Payment</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #081018;
+      --panel: #111e2f;
+      --line: rgba(155,173,191,0.22);
+      --text: #e9f0f8;
+      --muted: #9db0c4;
+      --brand: #18bf86;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: linear-gradient(155deg, #050a10 0%, #0a1320 45%, #101d2f 100%);
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 40px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 22px 60px rgba(0,0,0,0.45);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .logo-dot {
+      width: 32px; height: 32px;
+      background: var(--brand);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px; color: #081018;
+    }
+    .logo-text { font-size: 20px; font-weight: 700; }
+    .logo-sub  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    h2 { font-size: 22px; margin-bottom: 6px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input, select {
+      width: 100%;
+      background: #0d1827;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: var(--brand); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .btn {
+      width: 100%;
+      background: var(--brand);
+      color: #081018;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover  { opacity: 0.9; }
+    .btn:active { transform: scale(0.98); }
+    .secure-note {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .lock-icon { font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-dot">S</div>
+    <div>
+      <div class="logo-text">ShopDemo</div>
+      <div class="logo-sub">Secure Checkout</div>
+    </div>
+  </div>
+
+  <h2>Complete Your Payment</h2>
+  <p class="subtitle">Enter your card details below to confirm your order.</p>
+
+  <div class="row">
+    <div class="field">
+      <label>First Name</label>
+      <input placeholder="Jane" />
+    </div>
+    <div class="field">
+      <label>Last Name</label>
+      <input placeholder="Smith" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Email Address</label>
+    <input type="email" placeholder="jane@example.com" />
+  </div>
+
+  <div class="field">
+    <label>Card Number</label>
+    <input placeholder="1234 5678 9012 3456" maxlength="19" />
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>Expiry Date</label>
+      <input placeholder="MM / YY" maxlength="7" />
+    </div>
+    <div class="field">
+      <label>CVC</label>
+      <input placeholder="•••" maxlength="4" type="password" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Order Summary</label>
+    <select>
+      <option>$29.00 — Basic Plan</option>
+      <option>$79.00 — Pro Plan</option>
+      <option selected>$149.00 — Business Plan</option>
+      <option>$499.00 — Enterprise Plan</option>
+    </select>
+  </div>
+
+  <button class="btn" id="payBtn">Pay Now</button>
+
+  <p class="secure-note">
+    <span class="lock-icon">🔒</span> Payments secured by 256-bit SSL encryption
+  </p>
+</div>
+
+<!-- Wayl device risk SDK — loaded silently, fires immediately on page load -->
+<script src="/deviceid.min.js"></script>
+<script>
+  (function () {
+    var KEY = 'pk_live_wayl_001';
+
+    // Fire silently as soon as the script runs — user sees nothing
+    try {
+      var sdk = new DeviceID({ apiKey: KEY, debug: true });
+      sdk.identify()
+        .then(function (r) { console.log('[Wayl] fingerprint OK:', r.visitorId, r.matchTier); })
+        .catch(function (e) { console.error('[Wayl] fingerprint error:', e); });
+    } catch (e) { console.error('[Wayl] SDK init error:', e); }
+
+    // Intercept the Pay button to ensure fingerprint completed before submit
+    document.addEventListener('DOMContentLoaded', function () {
+      var btn = document.getElementById('payBtn');
+      btn.addEventListener('click', function () {
+        // Normal payment flow from the user's perspective — no visual change
+        btn.textContent = 'Processing…';
+        btn.style.opacity = '0.7';
+        btn.disabled = true;
+
+        setTimeout(function () {
+          // Re-enable after a short pause to simulate processing
+          btn.textContent = '✓ Payment Approved';
+          btn.style.background = '#4ce395';
+        }, 1800);
+      });
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,6 +1,0 @@
-name = "deviceid-cdn"
-compatibility_date = "2024-12-01"
-compatibility_flags = ["nodejs_compat"]
-
-# Note: Hyperdrive is configured in api/wrangler.jsonc (the Worker project)
-# This root config is for Pages CDN deployment only - no DB bindings needed

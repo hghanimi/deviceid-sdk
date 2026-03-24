@@ -1,24 +1,15 @@
 {
   "name": "deviceid-sdk",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "3.1.0",
+  "description": "Athar — Device intelligence SDK for MENA financial services",
+  "main": "src/client/index.js",
   "scripts": {
-    "build": "node build.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npx terser src/client/index.js -o dist/deviceid.min.js -c -m",
+    "deploy:worker": "cd api && npx wrangler deploy src/index.ts --config wrangler.jsonc",
+    "deploy:cdn": "npx wrangler pages deploy dist --project-name deviceid-cdn --branch main --commit-dirty=true"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "hono": "^4.12.9",
-    "nanoid": "^5.1.7",
-    "pg": "^8.20.0"
-  },
-  "devDependencies": {
-    "esbuild": "^0.27.4"
-  }
+  "type": "commonjs"
 }
