@@ -88,7 +88,9 @@ class DeviceID {
       intlProbe: this._getIntlProbe(),
       evasion: {
         headlessScore: this._detectHeadless(),
-        isPrivate: priv,
+        isPrivate: priv.isPrivate !== undefined ? priv.isPrivate : priv,
+        privacyScore: priv.score || 0,
+        privacyDetails: priv.details || {},
         webrtcIPs: rtc,
         bot: this._detectBot(),
         tampering: this._detectTampering(),
@@ -756,15 +758,22 @@ class DeviceID {
   }
 
   _detectBot() {
-    return {
+    var b = {
       phantom: !!window.callPhantom || !!window._phantom,
       webdriver: !!navigator.webdriver,
       nightmare: !!window.__nightmare,
       selenium: !!window._selenium || !!document.__webdriver_evaluate || !!document.__selenium_unwrapped,
       domAuto: !!window.domAutomation || !!window.domAutomationController,
-      headlessUA: /HeadlessChrome/.test(navigator.userAgent),
+      headlessUA: /HeadlessChrome|HeadlessFirefox/.test(navigator.userAgent),
       puppeteer: !!(navigator.webdriver && window.chrome && !window.chrome.runtime),
+      playwright: !!(window._playwrightBinding || window.__playwright),
+      cypress: !!(window.Cypress || window.cy),
+      cefSharp: !!window.CefSharp,
     };
+    // Search automation signals
+    try { b.automationKeys = !!navigator.webdriver || !!window.__fxdriver_unwrapped; } catch(e) { b.automationKeys = false; }
+    try { b.chromeHeadless = !window.chrome && /Chrome/.test(navigator.userAgent) && navigator.plugins.length === 0; } catch(e) { b.chromeHeadless = false; }
+    return b;
   }
 
   _detectTampering() {
@@ -804,10 +813,64 @@ class DeviceID {
   _detectPrivate() {
     return new Promise(async function (resolve) {
       var score = 0;
+      var details = { brave: false, firefoxStrict: false, privacyExtension: false, mode: null };
       var ua = navigator.userAgent || '';
       var isChromeFamily = /Chrome|CriOS|Edg\//.test(ua) && !/Firefox|FxiOS/.test(ua);
       var isFirefox = /Firefox|FxiOS/.test(ua);
       var isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
+
+      // ── Brave Detection ──
+      try {
+        if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
+          var isBrave = await navigator.brave.isBrave();
+          if (isBrave) details.brave = true;
+        }
+      } catch (e) {}
+      // Fallback: Brave blocks certain APIs
+      if (!details.brave) {
+        try {
+          var cv = document.createElement('canvas');
+          var ctx = cv.getContext('2d');
+          ctx.fillText('!', 0, 0);
+          var d1 = cv.toDataURL();
+          ctx.fillText('!', 0, 0);
+          var d2 = cv.toDataURL();
+          if (d1 !== d2) details.brave = true; // Brave randomizes canvas
+        } catch (e) {}
+      }
+
+      // ── Firefox Strict / Enhanced Tracking Protection ──
+      if (isFirefox) {
+        try {
+          // ETP blocks cross-site tracking cookies; test by checking third-party cookie ability
+          if (typeof document.hasStorageAccess === 'function') {
+            var hasAccess = await document.hasStorageAccess();
+            if (!hasAccess) { details.firefoxStrict = true; score += 1; }
+          }
+        } catch (e) { details.firefoxStrict = true; }
+        try {
+          // Firefox strict blocks fingerprinting APIs
+          if (navigator.hardwareConcurrency === undefined || navigator.hardwareConcurrency === 2) {
+            // Firefox resist-fingerprinting spoofs cores to 2
+            if (screen.colorDepth === 24 && window.devicePixelRatio === 1) {
+              details.firefoxStrict = true;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // ── Privacy Extension Detection ──
+      try {
+        // Check if common ad/tracking domains are blocked (heuristic)
+        var testImg = new Image();
+        var extBlocked = await new Promise(function(done) {
+          testImg.onload = function() { done(false); };
+          testImg.onerror = function() { done(true); };
+          testImg.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?t=' + Date.now();
+          setTimeout(function() { done(true); }, 1500);
+        });
+        if (extBlocked) details.privacyExtension = true;
+      } catch (e) {}
 
       // ── CHECK 1: Storage Quota (Chrome incognito caps to ~60% of normal) ──
       try {
@@ -924,7 +987,12 @@ class DeviceID {
         }
       } catch (e) {}
 
-      resolve(score >= 2);
+      var isPrivate = score >= 2;
+      if (isPrivate) details.mode = 'incognito';
+      else if (details.brave) details.mode = 'brave';
+      else if (details.firefoxStrict) details.mode = 'enhanced_tracking_protection';
+      else if (details.privacyExtension) details.mode = 'extension';
+      resolve({ isPrivate: isPrivate, score: score, details: details });
     });
   }
 

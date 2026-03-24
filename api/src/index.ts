@@ -738,6 +738,16 @@ app.post('/v1/fingerprint', async (c) => {
     // headlessScore is a 0-1 float; cast to 0-100 integer for the INTEGER DB column
     const headlessScoreInt = Math.round((evasion?.headlessScore || 0) * 100);
     const botCount = Object.values(evasion?.bot || {}).filter(Boolean).length;
+
+    // Bot classification: good (search engines), bad (malicious), notDetected
+    const botClassification = (() => {
+      if (botCount === 0 && (evasion?.headlessScore || 0) <= 0.4) return 'notDetected';
+      const ua = (c.req.header('User-Agent') || '').toLowerCase();
+      const goodBotPatterns = ['googlebot','bingbot','yandexbot','duckduckbot','slurp','baiduspider',
+        'facebot','linkedinbot','twitterbot','applebot','semrushbot','ahrefsbot','mj12bot'];
+      if (goodBotPatterns.some(p => ua.includes(p))) return 'good';
+      return 'bad';
+    })();
     const normalizedClientIp = normalizeIp(clientIp);
 
     const isIPv4 = (ip: string) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip);
@@ -809,6 +819,34 @@ app.post('/v1/fingerprint', async (c) => {
       }
     }
 
+    // (d) OS mismatch — compare browser UA OS vs IP geolocation network signature
+    const browserUA_vpn = c.req.header('User-Agent') || '';
+    const uaPlatform = (() => {
+      if (/Windows/.test(browserUA_vpn)) return 'windows';
+      if (/Macintosh|Mac OS/.test(browserUA_vpn)) return 'mac';
+      if (/Linux/.test(browserUA_vpn) && !/Android/.test(browserUA_vpn)) return 'linux';
+      if (/Android/.test(browserUA_vpn)) return 'android';
+      if (/iPhone|iPad/.test(browserUA_vpn)) return 'ios';
+      return 'unknown';
+    })();
+    // Check signals.hardware.platform for mismatch with UA
+    const hwPlatform = (signals.hardware?.platform || '').toLowerCase();
+    let osMismatch = false;
+    if (hwPlatform && uaPlatform !== 'unknown') {
+      const platformMap: Record<string, string[]> = {
+        windows: ['win32', 'win64', 'windows'],
+        mac: ['macintel', 'macppc', 'mac'],
+        linux: ['linux x86_64', 'linux aarch64', 'linux'],
+        android: ['linux armv', 'linux aarch64', 'android'],
+        ios: ['iphone', 'ipad', 'ipod'],
+      };
+      const expected = platformMap[uaPlatform] || [];
+      if (expected.length > 0 && !expected.some(p => hwPlatform.includes(p))) {
+        osMismatch = true;
+        vpnScore += 1;
+      }
+    }
+
     // Threshold: score ≥ 2 = VPN.
     let isVpn = vpnScore >= 2;
 
@@ -833,15 +871,54 @@ app.post('/v1/fingerprint', async (c) => {
     else if (isDatacenter) { proxyType = 'datacenter'; proxyConfidence = 'high'; }
     else if (isVpn && !isDatacenter) { proxyType = 'residential'; proxyConfidence = 'medium'; }
 
+    // Proxy confidence refinement based on activity history
+    // If this IP has been seen with multiple distinct visitors, it's likely a proxy/shared IP
+    let ipDistinctVisitors = 0;
+    try {
+      const ipVisQ = await db.query(
+        `SELECT COUNT(DISTINCT visitor_id)::int AS cnt
+         FROM fingerprints WHERE ip_address = $1 AND api_key_id = $2
+           AND last_seen >= NOW() - INTERVAL '7 days'`,
+        [clientIp, apiKeyId]
+      );
+      ipDistinctVisitors = ipVisQ.rows[0]?.cnt || 0;
+      if (ipDistinctVisitors >= 10 && proxyType === 'none') {
+        proxyType = 'residential'; proxyConfidence = 'medium';
+      } else if (ipDistinctVisitors >= 5 && proxyConfidence === 'medium') {
+        proxyConfidence = 'high';
+      }
+    } catch (e) {}
+
     // ─── IP BLOCKLIST CHECK ───
-    // Heuristic blocklist: check if IP's ASN belongs to known bad-actor ranges
     const blocklist = {
       result: false,
       details: { emailSpam: false, attackSource: false, datacenter: isDatacenter }
     };
-    // Tor exit node detection via Cloudflare header
     const isTor = (cfData.isTor === true || cfData.isTor === 'true');
     if (isTor) { blocklist.result = true; blocklist.details.attackSource = true; proxyType = 'tor'; }
+
+    // Replay detection: if 75%+ of events from this IP in 7 days are replayed visitor_ids
+    let replayPct = 0;
+    try {
+      const replayQ = await db.query(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE visit_count > 1)::int AS revisits
+         FROM fingerprints WHERE ip_address = $1 AND api_key_id = $2
+           AND last_seen >= NOW() - INTERVAL '7 days'`,
+        [clientIp, apiKeyId]
+      );
+      const total = replayQ.rows[0]?.total || 0;
+      const revisits = replayQ.rows[0]?.revisits || 0;
+      replayPct = total > 0 ? Math.round((revisits / total) * 100) : 0;
+      if (replayPct >= 75 && total >= 4) {
+        blocklist.result = true;
+        blocklist.details.attackSource = true;
+      }
+    } catch (e) {}
+    if (isDatacenter && botCount > 0) {
+      blocklist.result = true;
+      blocklist.details.attackSource = true;
+    }
 
     // ─── LOCATION SPOOFING (server-side cross-check) ───
     const locSpoof = evasion?.locationSpoofing || {};
@@ -1234,14 +1311,15 @@ app.post('/v1/fingerprint', async (c) => {
     const finalIsVpn = isVpn || vpnByIpRotation || vpnByIpSwitch;
 
     // ─── VELOCITY SIGNALS (events/IPs over time windows) ───
-    let velocity = {
+    let velocity: any = {
       distinctIp: { '5m': 0, '1h': 0, '24h': 0 },
       events: { '5m': 0, '1h': 0, '24h': 0 },
       distinctCountry: { '5m': 0, '1h': 0, '24h': 0 },
       ipEvents: { '5m': 0, '1h': 0, '24h': 0 },
+      ipDistinctVisitors: { '1h': 0, '24h': 0 },
     };
     try {
-      const [vel5m, vel1h, vel24h, ipVel] = await Promise.all([
+      const [vel5m, vel1h, vel24h, ipVel, ipVisitors1h, ipVisitors24h] = await Promise.all([
         db.query(
           `SELECT COUNT(*)::int AS events,
                   COUNT(DISTINCT ip_address)::int AS distinct_ip
@@ -1269,6 +1347,18 @@ app.post('/v1/fingerprint', async (c) => {
              AND created_at >= NOW() - INTERVAL '24 hours'`,
           [clientIp, apiKeyId]
         ),
+        db.query(
+          `SELECT COUNT(DISTINCT visitor_id)::int AS cnt
+           FROM events WHERE ip_address = $1 AND api_key_id = $2
+             AND created_at >= NOW() - INTERVAL '1 hour'`,
+          [clientIp, apiKeyId]
+        ),
+        db.query(
+          `SELECT COUNT(DISTINCT visitor_id)::int AS cnt
+           FROM events WHERE ip_address = $1 AND api_key_id = $2
+             AND created_at >= NOW() - INTERVAL '24 hours'`,
+          [clientIp, apiKeyId]
+        ),
       ]);
       velocity.events['5m'] = vel5m.rows[0]?.events || 0;
       velocity.events['1h'] = vel1h.rows[0]?.events || 0;
@@ -1279,15 +1369,34 @@ app.post('/v1/fingerprint', async (c) => {
       velocity.ipEvents['5m'] = Math.min(vel5m.rows[0]?.events || 0, velocity.events['5m']);
       velocity.ipEvents['1h'] = Math.min(vel1h.rows[0]?.events || 0, velocity.events['1h']);
       velocity.ipEvents['24h'] = ipVel.rows[0]?.ip_events || 0;
+      velocity.ipDistinctVisitors['1h'] = ipVisitors1h.rows[0]?.cnt || 0;
+      velocity.ipDistinctVisitors['24h'] = ipVisitors24h.rows[0]?.cnt || 0;
     } catch (e) {
       console.error('Velocity query error:', e);
     }
+
+    // Distinct countries for this visitor (from fingerprints table geo data stored by CF)
+    try {
+      const countryQ = await db.query(
+        `SELECT\n           COUNT(DISTINCT CASE WHEN last_seen >= NOW() - INTERVAL '5 minutes' THEN ip_address END)::int AS c5m,\n           COUNT(DISTINCT CASE WHEN last_seen >= NOW() - INTERVAL '1 hour' THEN ip_address END)::int AS c1h,\n           COUNT(DISTINCT ip_address)::int AS c24h\n         FROM fingerprints WHERE visitor_id = $1 AND api_key_id = $2\n           AND last_seen >= NOW() - INTERVAL '24 hours'`,
+        [visitorId, apiKeyId]
+      );
+      // Use distinct IPs as proxy for distinct countries (each IP = potential different country)
+      // For accurate country counts, we'd need to store country per event
+      velocity.distinctCountry['5m'] = Math.min(velocity.distinctIp['5m'], countryQ.rows[0]?.c5m || 0);
+      velocity.distinctCountry['1h'] = Math.min(velocity.distinctIp['1h'], countryQ.rows[0]?.c1h || 0);
+      velocity.distinctCountry['24h'] = Math.min(velocity.distinctIp['24h'], countryQ.rows[0]?.c24h || 0);
+    } catch (e) {}
+
     const highActivity = velocity.events['1h'] > 20 || velocity.events['5m'] > 10;
 
     // ─── Risk scoring (contextual — VPN alone ≠ risky) ───
-    // Philosophy: normal people use VPNs, incognito, new devices.
-    // Risk = evasion INTENT, measured by combining multiple signals.
-    let riskScore = 0;
+    // Weighted suspect score: each signal has a weight and a 0-1 score.
+    // Final suspectScore = weighted average × 100, capped at 0-100.
+    const riskSignalWeights: Array<{ name: string; weight: number; score: number }> = [];
+    const addRisk = (name: string, weight: number, active: boolean, intensity?: number) => {
+      riskSignalWeights.push({ name, weight, score: active ? (intensity ?? 1.0) : 0 });
+    };
 
     // Count evasion layers — risk compounds when stacked
     const evasionLayers =
@@ -1296,49 +1405,41 @@ app.post('/v1/fingerprint', async (c) => {
       (ipChanged ? 1 : 0) +
       (botCount > 0 ? 1 : 0) +
       ((evasion?.headlessScore || 0) > 0.4 ? 1 : 0);
+    const layerMultiplier = Math.min(2.0, 1.0 + (evasionLayers - 1) * 0.25);
 
-    // ── VPN: only risky when combined with other evasion ──
-    if (finalIsVpn) {
-      if (evasionLayers >= 3)        riskScore += 25;  // VPN + incognito + bot/headless = serious
-      else if (evasionLayers >= 2)   riskScore += 15;  // VPN + one other signal = moderate
-      else                           riskScore += 5;   // VPN alone = negligible (normal user)
-    }
-
-    // ── Incognito: same logic — alone is fine ──
-    if (evasion?.isPrivate) {
-      if (evasionLayers >= 3)        riskScore += 20;
-      else if (evasionLayers >= 2)   riskScore += 10;
-      else                           riskScore += 3;   // incognito alone = negligible
-    }
-
-    // ── Hard signals — these ARE inherently suspicious ──
-    if ((evasion?.headlessScore || 0) > 0.4) riskScore += 30;  // headless browser
-    if (botCount > 0)                        riskScore += 35;  // bot behavior
+    // VPN: context-dependent
+    addRisk('vpn', 15, finalIsVpn, evasionLayers >= 3 ? 1.0 : evasionLayers >= 2 ? 0.6 : 0.2);
+    // Incognito: context-dependent
+    addRisk('incognito', 10, evasion?.isPrivate || false, evasionLayers >= 3 ? 1.0 : evasionLayers >= 2 ? 0.5 : 0.15);
+    // Hard signals
+    addRisk('headless', 20, (evasion?.headlessScore || 0) > 0.4, Math.min(1.0, (evasion?.headlessScore || 0) * 2));
+    addRisk('bot', 25, botCount > 0, Math.min(1.0, botCount / 4));
+    // Tampering
     const tampering = evasion?.tampering || {};
-    if (tampering.canvasOverride)    riskScore += 20;
-    if (tampering.uaOverride)        riskScore += 15;
-    if (tampering.navigatorProxy)    riskScore += 20;
-    if (tampering.genericRenderer)   riskScore += 10;
-    if (tampering.screenMismatch)    riskScore += 15;
-
-    // ── Contextual signals ──
-    if (linkedResult.rows.length > 3)      riskScore += 10;   // large device cluster
-    if (ipChanged && !finalIsVpn)          riskScore += 10;   // IP changed without VPN = sus
-    if (isNew && evasionLayers >= 2)       riskScore += 10;   // new + hiding = sus
-    // New device alone = 0 risk (everyone is new once)
-
-    // Inherited risk from linked devices (reduced weights)
-    if (linkedRiskFlags.bot)         riskScore += 15;
-    if (linkedRiskFlags.headless)    riskScore += 10;
-    if (linkedRiskFlags.vpn && linkedRiskFlags.incognito) riskScore += 10; // linked device was hiding
-
-    // ── New v3.1 signals ──
+    const tamperCount = Object.values(tampering).filter(Boolean).length;
+    addRisk('tampering', 20, tamperCount > 0, Math.min(1.0, tamperCount / 3));
+    // Contextual
+    addRisk('deviceCluster', 5, linkedResult.rows.length > 3, Math.min(1.0, linkedResult.rows.length / 8));
+    addRisk('ipChanged', 5, ipChanged && !finalIsVpn);
+    addRisk('newAndHiding', 8, isNew && evasionLayers >= 2, Math.min(1.0, evasionLayers / 4));
+    // Inherited risk
+    addRisk('linkedBot', 10, linkedRiskFlags.bot);
+    addRisk('linkedHeadless', 5, linkedRiskFlags.headless);
+    addRisk('linkedEvasion', 5, linkedRiskFlags.vpn && linkedRiskFlags.incognito);
+    // v3.1 signals
     const devToolsOpen = evasion?.devTools?.open || false;
     const vmResult = evasion?.virtualMachine?.result || false;
-    if (vmResult)                    riskScore += 15;   // virtual machine
-    if (locationSpoofResult)         riskScore += 20;   // spoofing location
-    if (highActivity)                riskScore += 10;   // velocity anomaly
-    if (isTor)                       riskScore += 25;   // Tor exit node
+    addRisk('virtualMachine', 10, vmResult);
+    addRisk('locationSpoofing', 15, locationSpoofResult);
+    addRisk('highActivity', 8, highActivity, Math.min(1.0, Math.max(velocity.events['1h'] / 40, velocity.events['5m'] / 20)));
+    addRisk('tor', 20, isTor);
+    addRisk('osMismatch', 8, osMismatch);
+    addRisk('replayAttack', 12, replayPct >= 75);
+
+    // Compute weighted average
+    const totalWeight = riskSignalWeights.reduce((sum, s) => sum + s.weight, 0);
+    const weightedSum = riskSignalWeights.reduce((sum, s) => sum + s.weight * s.score, 0);
+    let riskScore = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100 * layerMultiplier) : 0;
     riskScore = Math.min(100, Math.max(0, riskScore));
 
     // ─── Cross-Device Person Resolution ───
@@ -1406,7 +1507,10 @@ app.post('/v1/fingerprint', async (c) => {
         },
         botd: {
           data: {
-            bot: { result: botCount >= 2 ? 'detected' : 'notDetected', score: botCount },
+            bot: {
+              result: botClassification,
+              type: botClassification === 'good' ? 'searchEngine' : botClassification === 'bad' ? 'automation' : undefined,
+            },
             meta: { ip: clientIp }
           }
         },
@@ -1419,7 +1523,7 @@ app.post('/v1/fingerprint', async (c) => {
             methods: {
               timezoneMismatch: vpnScore >= 3 && ipOffsetMin !== null,
               publicVPN: isVpnAsn,
-              osMismatch: false,
+              osMismatch,
               relay: false,
               webrtcLeak: publicWebrtcIps.length > 0 && publicWebrtcIps.every((ip: string) => ip !== normalizedClientIp),
             },
@@ -1429,11 +1533,11 @@ app.post('/v1/fingerprint', async (c) => {
           data: {
             result: proxyType !== 'none',
             confidence: proxyConfidence,
-            details: { proxyType },
+            details: { proxyType, ipDistinctVisitors7d: ipDistinctVisitors },
           }
         },
         tor: { data: { result: isTor } },
-        ipBlocklist: { data: blocklist },
+        ipBlocklist: { data: { ...blocklist, replayPct } },
         incognito: { data: { result: evasion?.isPrivate || false } },
         tampering: {
           data: {
@@ -1451,15 +1555,35 @@ app.post('/v1/fingerprint', async (c) => {
         frida: { data: { result: false } },
         jailbroken: { data: { result: false } },
         clonedApp: { data: { result: false } },
-        privacySettings: { data: { result: evasion?.isPrivate || false } },
+        privacySettings: {
+          data: {
+            result: evasion?.isPrivate || evasion?.privacyDetails?.brave || evasion?.privacyDetails?.firefoxStrict || evasion?.privacyDetails?.privacyExtension || false,
+            brave: evasion?.privacyDetails?.brave || false,
+            firefoxStrict: evasion?.privacyDetails?.firefoxStrict || false,
+            privacyExtension: evasion?.privacyDetails?.privacyExtension || false,
+            mode: evasion?.privacyDetails?.mode || null,
+            privacyScore: evasion?.privacyScore || 0,
+          }
+        },
         factoryReset: { data: { time: null, timestamp: 0 } },
         velocity: { data: velocity },
-        suspectScore: { data: { result: riskScore } },
+        suspectScore: {
+          data: {
+            result: riskScore,
+            breakdown: riskSignalWeights.filter(s => s.score > 0).map(s => ({
+              signal: s.name, weight: s.weight, intensity: Math.round(s.score * 100) / 100,
+            })),
+          }
+        },
         ipInfo: {
           data: {
             v4: {
               address: clientIp,
               geolocation: {
+                accuracyRadius: cfData.city ? (isDatacenter ? 200 : 50) : (cfData.region ? 100 : 500),
+                latitude: cfData.latitude || null,
+                longitude: cfData.longitude || null,
+                postalCode: cfData.postalCode || null,
                 timezone: cfData.timezone || null,
                 city: cfData.city ? { name: cfData.city } : null,
                 country: cfData.country ? { code: cfData.country, name: cfData.country } : null,
@@ -1469,7 +1593,8 @@ app.post('/v1/fingerprint', async (c) => {
               asn: {
                 asn: String(cfData.asn || ''),
                 name: cfData.asOrganization || '',
-                type: isDatacenter ? 'hosting' : 'isp',
+                network: `${clientIp}/24`,
+                type: isDatacenter ? 'hosting' : isVpnAsn ? 'hosting' : 'isp',
               },
               datacenter: { result: isDatacenter, name: isDatacenter ? cfData.asOrganization : '' },
             },
@@ -1484,7 +1609,7 @@ app.post('/v1/fingerprint', async (c) => {
         vpn: finalIsVpn,
         incognito: evasion?.isPrivate || false,
         headless: (evasion?.headlessScore || 0) > 0.4,
-        bot: botCount >= 2,
+        bot: botClassification === 'bad',
         tampered: !!(tampering.canvasOverride || tampering.uaOverride || tampering.navigatorProxy),
         multiAccount: linkedResult.rows.length > 1,
         ipChanged,
@@ -1493,6 +1618,7 @@ app.post('/v1/fingerprint', async (c) => {
         devTools: devToolsOpen,
         locationSpoofing: locationSpoofResult,
         highActivity,
+        osMismatch,
         linkedRisk: linkedRiskFlags,
       },
       identity: {
