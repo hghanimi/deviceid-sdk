@@ -3,9 +3,9 @@ import { cors } from 'hono/cors';
 import { Client } from 'pg';
 import { nanoid } from 'nanoid';
 import { createHash } from 'crypto';
-import { screenMerchant, SanctionsScreener } from './screening';
+import { screenMerchant, SanctionsScreener, OpenSanctionsScreener } from './screening';
 
-const app = new Hono<{ Bindings: { DATABASE_URL: string } }>();
+const app = new Hono<{ Bindings: { DATABASE_URL: string; OPENSANCTIONS_API_KEY?: string } }>();
 
 const normalizeIp = (ip?: string | null): string => {
   if (!ip) return '';
@@ -373,6 +373,7 @@ app.use('*', async (c, next) => {
     await client.query(`
       ALTER TABLE merchants ADD COLUMN IF NOT EXISTS last_screened_at TIMESTAMPTZ;
       ALTER TABLE merchant_owners ADD COLUMN IF NOT EXISTS last_screened_at TIMESTAMPTZ;
+      ALTER TABLE merchant_owners ADD COLUMN IF NOT EXISTS pep_status TEXT NOT NULL DEFAULT 'pending';
     `);
   } catch (e) { /* columns already exist or non-fatal */ }
   c.set('db', client);
@@ -2049,9 +2050,10 @@ app.post('/v1/merchants/:id/screen', async (c) => {
   const apiKey = c.get('apiKey') as any;
   const merchantId = c.req.param('id');
   const clientIp = c.req.header('CF-Connecting-IP') || '0.0.0.0';
+  const osApiKey = c.env.OPENSANCTIONS_API_KEY;
 
   try {
-    const result = await screenMerchant(db, merchantId, apiKey, clientIp);
+    const result = await screenMerchant(db, merchantId, apiKey, clientIp, osApiKey);
     return c.json(result);
   } catch (err: any) {
     if (err.message === 'MERCHANT_NOT_FOUND') return c.json({ error: 'Merchant not found' }, 404);
@@ -2063,7 +2065,11 @@ app.post('/v1/merchants/:id/screen', async (c) => {
 // GET /v1/screening/stats — Sanctions list cache stats
 app.get('/v1/screening/stats', async (c) => {
   const screener = SanctionsScreener.getInstance();
-  return c.json(screener.getStats());
+  const osEnabled = c.env.OPENSANCTIONS_API_KEY !== undefined;
+  return c.json({
+    ...screener.getStats(),
+    openSanctions: { enabled: osEnabled, endpoint: osEnabled ? 'https://api.opensanctions.org/match/default' : null },
+  });
 });
 
 export default app;

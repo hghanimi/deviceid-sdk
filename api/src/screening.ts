@@ -1,5 +1,5 @@
 // api/src/screening.ts — Sanctions Screening Engine for Cloudflare Workers
-// Checks against OFAC SDN, UN Consolidated, and EU Financial Sanctions lists
+// Checks against OFAC SDN, UN Consolidated, EU, and OpenSanctions lists
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -7,11 +7,12 @@ export interface SanctionsEntry {
   name: string;
   nameNormalized: string;
   aliases: string[];
-  listSource: 'OFAC' | 'UN' | 'EU';
+  listSource: 'OFAC' | 'UN' | 'EU' | 'OpenSanctions';
   entityId: string;
   programs: string[];
   dateOfBirth?: string;
   nationality?: string;
+  isPEP?: boolean;
 }
 
 export interface ScreenMatch {
@@ -21,6 +22,8 @@ export interface ScreenMatch {
   listSource: string;
   entityId: string;
   programs: string[];
+  isPEP?: boolean;
+  datasets?: string[];
 }
 
 export interface ScreenEntityInput {
@@ -35,7 +38,9 @@ export interface OwnerScreenResult {
   ownerId: string;
   ownerName: string;
   status: 'clear' | 'flagged';
+  pepStatus: 'clear' | 'match';
   matches: ScreenMatch[];
+  pepMatches: ScreenMatch[];
 }
 
 export interface ScreeningResult {
@@ -45,6 +50,7 @@ export interface ScreeningResult {
   ownerResults: OwnerScreenResult[];
   alertsCreated: number;
   screenedAt: string;
+  sources: string[];
 }
 
 // ─── Arabic Text Normalization ─────────────────────────────────────────────────
@@ -614,7 +620,284 @@ export class SanctionsScreener {
   }
 }
 
-// ─── screenEntity ──────────────────────────────────────────────────────────────
+// ─── OpenSanctions API Screener ───────────────────────────────────────────────
+
+const OS_API_BASE = 'https://api.opensanctions.org';
+const OS_TIMEOUT = 5000; // 5 second max per request
+
+interface OSMatchResult {
+  id: string;
+  caption: string;
+  schema: string;
+  properties: Record<string, string[]>;
+  datasets: string[];
+  referents: string[];
+  score: number;
+  features: Record<string, number>;
+  match: boolean;
+}
+
+interface OSMatchResponse {
+  responses: Record<string, { query: any; results: OSMatchResult[]; total: { value: number } }>;
+}
+
+export class OpenSanctionsScreener {
+  private apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OS_TIMEOUT);
+    try {
+      const resp = await fetch(url, { ...init, signal: controller.signal });
+      return resp;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Match a person entity against OpenSanctions.
+   * Returns sanctions matches and PEP matches separately.
+   */
+  async matchPerson(input: ScreenEntityInput): Promise<{ sanctions: ScreenMatch[]; pep: ScreenMatch[] }> {
+    const names: string[] = [input.name];
+    if (input.nameAr) names.push(input.nameAr);
+    if (input.aliases) names.push(...input.aliases);
+
+    const properties: Record<string, string[]> = {
+      name: names,
+    };
+    if (input.dateOfBirth) properties.birthDate = [input.dateOfBirth];
+    if (input.nationality) properties.nationality = [input.nationality];
+
+    const body = {
+      queries: {
+        q1: {
+          schema: 'Person',
+          properties,
+        },
+      },
+    };
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Athar-Compliance/1.0',
+      };
+      if (this.apiKey) {
+        headers['Authorization'] = `ApiKey ${this.apiKey}`;
+      }
+
+      const resp = await this.fetchWithTimeout(`${OS_API_BASE}/match/default`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok) {
+        console.error(`OpenSanctions API error: ${resp.status} ${resp.statusText}`);
+        return { sanctions: [], pep: [] };
+      }
+
+      const data: OSMatchResponse = await resp.json() as any;
+      const results = data.responses?.q1?.results || [];
+
+      const sanctions: ScreenMatch[] = [];
+      const pep: ScreenMatch[] = [];
+
+      for (const r of results) {
+        if (r.score < 0.50) continue; // Very low scores — skip
+
+        const datasets = r.datasets || [];
+        const isPEP = datasets.some(d =>
+          d.includes('pep') || d.includes('politically') || d === 'wd_peps'
+          || d.includes('rupep') || d.includes('everypolitician')
+        );
+        const isSanctions = datasets.some(d =>
+          d.includes('sanction') || d.includes('ofac') || d.includes('un_sc')
+          || d.includes('eu_fsf') || d.includes('sdn') || d.includes('consolidated')
+        ) || !isPEP; // Default to sanctions if no clear PEP indicator
+
+        const matchedName = r.caption || r.properties?.name?.[0] || 'Unknown';
+        // Normalize OpenSanctions score (0-1) to our scale — OS scores tend to be 0.5-1.0
+        const normalizedScore = Math.round(r.score * 10000) / 10000;
+
+        const match: ScreenMatch = {
+          matchScore: normalizedScore,
+          matchedName,
+          queriedName: input.name,
+          listSource: 'OpenSanctions',
+          entityId: r.id,
+          programs: datasets.slice(0, 5), // Limit to first 5 datasets
+          isPEP,
+          datasets,
+        };
+
+        if (isPEP) {
+          pep.push(match);
+        }
+        if (isSanctions) {
+          sanctions.push(match);
+        }
+      }
+
+      sanctions.sort((a, b) => b.matchScore - a.matchScore);
+      pep.sort((a, b) => b.matchScore - a.matchScore);
+
+      return { sanctions, pep };
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.error('OpenSanctions API timeout (5s)');
+      } else {
+        console.error('OpenSanctions API error:', err.message);
+      }
+      return { sanctions: [], pep: [] };
+    }
+  }
+
+  /**
+   * Match an organization entity against OpenSanctions.
+   */
+  async matchOrganization(input: ScreenEntityInput): Promise<{ sanctions: ScreenMatch[]; pep: ScreenMatch[] }> {
+    const names: string[] = [input.name];
+    if (input.nameAr) names.push(input.nameAr);
+    if (input.aliases) names.push(...input.aliases);
+
+    const body = {
+      queries: {
+        q1: {
+          schema: 'Organization',
+          properties: { name: names },
+        },
+      },
+    };
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Athar-Compliance/1.0',
+      };
+      if (this.apiKey) {
+        headers['Authorization'] = `ApiKey ${this.apiKey}`;
+      }
+
+      const resp = await this.fetchWithTimeout(`${OS_API_BASE}/match/default`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      if (!resp.ok) {
+        console.error(`OpenSanctions API error: ${resp.status}`);
+        return { sanctions: [], pep: [] };
+      }
+
+      const data: OSMatchResponse = await resp.json() as any;
+      const results = data.responses?.q1?.results || [];
+
+      const sanctions: ScreenMatch[] = [];
+      for (const r of results) {
+        if (r.score < 0.50) continue;
+        sanctions.push({
+          matchScore: Math.round(r.score * 10000) / 10000,
+          matchedName: r.caption || r.properties?.name?.[0] || 'Unknown',
+          queriedName: input.name,
+          listSource: 'OpenSanctions',
+          entityId: r.id,
+          programs: (r.datasets || []).slice(0, 5),
+          isPEP: false,
+          datasets: r.datasets || [],
+        });
+      }
+      sanctions.sort((a, b) => b.matchScore - a.matchScore);
+      return { sanctions, pep: [] };
+    } catch (err: any) {
+      console.error('OpenSanctions org match error:', err.message);
+      return { sanctions: [], pep: [] };
+    }
+  }
+}
+
+// ─── Composite Screener ───────────────────────────────────────────────────────
+
+/**
+ * Runs both local OFAC/UN/EU screening and OpenSanctions in parallel.
+ * Deduplicates by entityId, keeps highest score per entity.
+ */
+export async function compositeScreenEntity(
+  input: ScreenEntityInput,
+  openSanctions: OpenSanctionsScreener | null,
+  localScreener?: SanctionsScreener,
+): Promise<{ sanctions: ScreenMatch[]; pep: ScreenMatch[] }> {
+  // Run local + OpenSanctions in parallel
+  const [localMatches, osResult] = await Promise.all([
+    screenEntity(input, localScreener),
+    openSanctions ? openSanctions.matchPerson(input) : Promise.resolve({ sanctions: [] as ScreenMatch[], pep: [] as ScreenMatch[] }),
+  ]);
+
+  // Combine and deduplicate sanctions matches
+  const sanctionsMap = new Map<string, ScreenMatch>();
+
+  for (const m of localMatches) {
+    const key = dedupeKey(m);
+    const existing = sanctionsMap.get(key);
+    if (!existing || m.matchScore > existing.matchScore) {
+      sanctionsMap.set(key, m);
+    }
+  }
+
+  for (const m of osResult.sanctions) {
+    const key = dedupeKey(m);
+    const existing = sanctionsMap.get(key);
+    if (!existing || m.matchScore > existing.matchScore) {
+      sanctionsMap.set(key, m);
+    }
+  }
+
+  const sanctions = Array.from(sanctionsMap.values())
+    .sort((a, b) => b.matchScore - a.matchScore);
+
+  // PEP matches (only from OpenSanctions)
+  const pep = osResult.pep;
+
+  return { sanctions, pep };
+}
+
+/**
+ * Composite screening for organizations (merchant legal names).
+ */
+export async function compositeScreenOrg(
+  input: ScreenEntityInput,
+  openSanctions: OpenSanctionsScreener | null,
+  localScreener?: SanctionsScreener,
+): Promise<ScreenMatch[]> {
+  const [localMatches, osResult] = await Promise.all([
+    screenEntity(input, localScreener),
+    openSanctions ? openSanctions.matchOrganization(input) : Promise.resolve({ sanctions: [] as ScreenMatch[], pep: [] as ScreenMatch[] }),
+  ]);
+
+  const map = new Map<string, ScreenMatch>();
+  for (const m of [...localMatches, ...osResult.sanctions]) {
+    const key = dedupeKey(m);
+    const existing = map.get(key);
+    if (!existing || m.matchScore > existing.matchScore) {
+      map.set(key, m);
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.matchScore - a.matchScore);
+}
+
+function dedupeKey(m: ScreenMatch): string {
+  // Use entityId as primary key. For cross-source dedup, also normalize name.
+  return `${m.entityId}`.toLowerCase();
+}
+
+// ─── screenEntity (local only) ─────────────────────────────────────────────────
 
 const MATCH_THRESHOLD = 0.85;
 
@@ -685,7 +968,7 @@ export async function screenEntity(
   return matches;
 }
 
-// ─── screenMerchant (DB-integrated) ───────────────────────────────────────────
+// ─── screenMerchant (DB-integrated, Composite) ───────────────────────────────
 
 const ALERT_THRESHOLD = 0.75;
 
@@ -694,6 +977,7 @@ export async function screenMerchant(
   merchantId: string,
   apiKey: any,
   clientIp: string,
+  openSanctionsApiKey?: string,
 ): Promise<ScreeningResult> {
   // 1. Get merchant + owners
   const mResult = await db.query(
@@ -719,17 +1003,24 @@ export async function screenMerchant(
     [merchantId],
   );
 
-  // 3. Ensure sanctions lists are loaded
-  const screener = SanctionsScreener.getInstance();
-  await screener.ensureLoaded();
+  // 3. Initialize screeners
+  const localScreener = SanctionsScreener.getInstance();
+  await localScreener.ensureLoaded();
 
-  // 4. Screen merchant legal name
+  const osScreener = openSanctionsApiKey !== undefined
+    ? new OpenSanctionsScreener(openSanctionsApiKey)
+    : null;
+
+  const activeSources = ['OFAC', 'UN', 'EU'];
+  if (osScreener) activeSources.push('OpenSanctions');
+
+  // 4. Screen merchant legal name (organization match)
   const merchantInput: ScreenEntityInput = {
     name: merchant.legal_name_en || merchant.legal_name_ar,
     nameAr: merchant.legal_name_ar,
     aliases: merchant.trade_name ? [merchant.trade_name] : [],
   };
-  const merchantMatches = await screenEntity(merchantInput, screener);
+  const merchantMatches = await compositeScreenOrg(merchantInput, osScreener, localScreener);
 
   // 5. Store merchant screening results
   for (const match of merchantMatches) {
@@ -744,22 +1035,21 @@ export async function screenMerchant(
         match.listSource,
         match.entityId,
         JSON.stringify(match.programs),
-        JSON.stringify({ queriedName: match.queriedName }),
+        JSON.stringify({ queriedName: match.queriedName, isPEP: false, datasets: match.datasets }),
       ],
     );
   }
 
-  // 6. Screen each owner
+  // 6. Screen each owner (person match + PEP)
   const ownerResults: OwnerScreenResult[] = [];
   let alertsCreated = 0;
 
   for (const owner of owners) {
-    // Build all name variants for this owner
+    // Build all name variants
     const nameVariants: string[] = [];
     if (owner.full_name_en) nameVariants.push(owner.full_name_en);
     if (owner.full_name_ar) nameVariants.push(owner.full_name_ar);
 
-    // Build full Arabic name from components if available
     const arParts = [
       owner.full_name_ar,
       owner.father_name_ar,
@@ -780,10 +1070,12 @@ export async function screenMerchant(
       nationality: owner.nationality,
     };
 
-    const ownerMatches = await screenEntity(input, screener);
+    // Composite screening: local + OpenSanctions (sanctions + PEP)
+    const { sanctions: ownerMatches, pep: pepMatches } = await compositeScreenEntity(input, osScreener, localScreener);
     const ownerStatus = ownerMatches.length > 0 ? 'flagged' : 'clear';
+    const pepStatus = pepMatches.length > 0 ? 'match' : 'clear';
 
-    // Store owner screening results
+    // Store sanctions screening results
     for (const match of ownerMatches) {
       await db.query(
         `INSERT INTO screening_results (merchant_id, owner_id, entity_name, matched_name, match_score, list_source, entity_id, programs, details)
@@ -797,19 +1089,31 @@ export async function screenMerchant(
           match.listSource,
           match.entityId,
           JSON.stringify(match.programs),
-          JSON.stringify({ queriedName: match.queriedName, dateOfBirth: input.dateOfBirth }),
+          JSON.stringify({ queriedName: match.queriedName, dateOfBirth: input.dateOfBirth, isPEP: false, datasets: match.datasets }),
         ],
       );
     }
 
-    // Create alerts for matches above alert threshold
-    const alertableMatches = ownerMatches.filter(m => m.matchScore >= ALERT_THRESHOLD);
-    for (const match of alertableMatches) {
-      // actually we need to check ALL matches >= ALERT_THRESHOLD, the screenEntity already uses 0.85 threshold
-      // so all returned matches are >= 0.85 which is > 0.75, so all will be alerted
+    // Store PEP screening results
+    for (const match of pepMatches) {
+      await db.query(
+        `INSERT INTO screening_results (merchant_id, owner_id, entity_name, matched_name, match_score, list_source, entity_id, programs, details)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
+        [
+          merchantId,
+          owner.id,
+          input.name,
+          match.matchedName,
+          match.matchScore,
+          'PEP',
+          match.entityId,
+          JSON.stringify(match.programs),
+          JSON.stringify({ queriedName: match.queriedName, isPEP: true, datasets: match.datasets }),
+        ],
+      );
     }
 
-    // Create alerts (all returned matches from screenEntity are >= 0.85 > ALERT_THRESHOLD)
+    // Create sanctions alerts
     for (const match of ownerMatches) {
       await db.query(
         `INSERT INTO merchant_alerts (merchant_id, owner_id, alert_type, severity, details)
@@ -831,16 +1135,46 @@ export async function screenMerchant(
       alertsCreated++;
     }
 
-    // Update owner screening status
+    // Create PEP alerts (don't block onboarding, but require enhanced due diligence)
+    for (const match of pepMatches) {
+      await db.query(
+        `INSERT INTO merchant_alerts (merchant_id, owner_id, alert_type, severity, details)
+         VALUES ($1, $2, 'pep_match', $3, $4::jsonb)`,
+        [
+          merchantId,
+          owner.id,
+          match.matchScore >= 0.90 ? 'high' : 'medium',
+          JSON.stringify({
+            matchScore: match.matchScore,
+            matchedName: match.matchedName,
+            queriedName: match.queriedName,
+            listSource: 'PEP',
+            entityId: match.entityId,
+            datasets: match.datasets,
+            note: 'PEP match — enhanced due diligence required',
+          }),
+        ],
+      );
+      alertsCreated++;
+    }
+
+    // Update owner screening + PEP status
     await db.query(
       `UPDATE merchant_owners
        SET screening_status = $1,
-           screening_result = $2::jsonb,
+           pep_status = $2,
+           screening_result = $3::jsonb,
            last_screened_at = NOW()
-       WHERE id = $3`,
+       WHERE id = $4`,
       [
         ownerStatus,
-        JSON.stringify({ matches: ownerMatches, screenedAt: new Date().toISOString() }),
+        pepStatus,
+        JSON.stringify({
+          sanctions: { matches: ownerMatches, count: ownerMatches.length },
+          pep: { matches: pepMatches, count: pepMatches.length, status: pepStatus },
+          screenedAt: new Date().toISOString(),
+          sources: activeSources,
+        }),
         owner.id,
       ],
     );
@@ -849,7 +1183,9 @@ export async function screenMerchant(
       ownerId: owner.id,
       ownerName: owner.full_name_en || owner.full_name_ar,
       status: ownerStatus,
+      pepStatus,
       matches: ownerMatches,
+      pepMatches,
     });
   }
 
@@ -898,8 +1234,11 @@ export async function screenMerchant(
         merchantMatches: merchantMatches.length,
         ownersScreened: owners.length,
         ownersFlagged: ownerResults.filter(o => o.status === 'flagged').length,
+        ownersPEP: ownerResults.filter(o => o.pepStatus === 'match').length,
         alertsCreated,
-        sanctionsStats: screener.getStats(),
+        sources: activeSources,
+        openSanctionsEnabled: !!osScreener,
+        sanctionsStats: localScreener.getStats(),
       }),
       clientIp,
     ],
@@ -912,5 +1251,6 @@ export async function screenMerchant(
     ownerResults,
     alertsCreated,
     screenedAt,
+    sources: activeSources,
   };
 }
