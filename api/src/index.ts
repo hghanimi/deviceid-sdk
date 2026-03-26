@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { Client } from 'pg';
 import { nanoid } from 'nanoid';
 import { createHash } from 'crypto';
+import { screenMerchant, SanctionsScreener } from './screening';
 
 const app = new Hono<{ Bindings: { DATABASE_URL: string } }>();
 
@@ -327,6 +328,19 @@ app.use('*', async (c, next) => {
         resolved BOOLEAN DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS screening_results (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+        owner_id UUID REFERENCES merchant_owners(id) ON DELETE CASCADE,
+        entity_name TEXT NOT NULL,
+        matched_name TEXT,
+        match_score DECIMAL(7,4),
+        list_source TEXT,
+        entity_id TEXT,
+        programs TEXT[],
+        details JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
       CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key_id);
       CREATE INDEX IF NOT EXISTS idx_merchants_kyc ON merchants(kyc_status);
       CREATE INDEX IF NOT EXISTS idx_merchant_owners_merchant ON merchant_owners(merchant_id);
@@ -334,6 +348,33 @@ app.use('*', async (c, next) => {
       CREATE INDEX IF NOT EXISTS idx_merchant_alerts_merchant ON merchant_alerts(merchant_id);
     `);
   } catch (e) { /* tables already exist or non-fatal */ }
+  // Screening tables — separate block to isolate from table creation
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS screening_results (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+        owner_id UUID REFERENCES merchant_owners(id) ON DELETE CASCADE,
+        entity_name TEXT NOT NULL,
+        matched_name TEXT,
+        match_score DECIMAL(7,4),
+        list_source TEXT,
+        entity_id TEXT,
+        programs TEXT DEFAULT '',
+        details JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_screening_results_merchant ON screening_results(merchant_id);
+      CREATE INDEX IF NOT EXISTS idx_screening_results_owner ON screening_results(owner_id);
+    `);
+  } catch (e) { console.error('screening_results migration:', e); }
+  // Schema evolution — separate block so column additions don't fail with table creation
+  try {
+    await client.query(`
+      ALTER TABLE merchants ADD COLUMN IF NOT EXISTS last_screened_at TIMESTAMPTZ;
+      ALTER TABLE merchant_owners ADD COLUMN IF NOT EXISTS last_screened_at TIMESTAMPTZ;
+    `);
+  } catch (e) { /* columns already exist or non-fatal */ }
   c.set('db', client);
   await next();
   await client.end();
@@ -2002,7 +2043,7 @@ app.patch('/v1/merchants/:id', async (c) => {
   }
 });
 
-// POST /v1/merchants/:id/screen — Trigger screening for merchant + owners
+// POST /v1/merchants/:id/screen — Run sanctions screening for merchant + owners
 app.post('/v1/merchants/:id/screen', async (c) => {
   const db = c.get('db') as any;
   const apiKey = c.get('apiKey') as any;
@@ -2010,43 +2051,19 @@ app.post('/v1/merchants/:id/screen', async (c) => {
   const clientIp = c.req.header('CF-Connecting-IP') || '0.0.0.0';
 
   try {
-    // Verify merchant
-    const mResult = await db.query(
-      `SELECT * FROM merchants WHERE id = $1 AND api_key_id = $2`,
-      [merchantId, apiKey.id]
-    );
-    if (mResult.rows.length === 0) return c.json({ error: 'Merchant not found' }, 404);
-
-    // Mark merchant screening in progress
-    await db.query(
-      `UPDATE merchants SET screening_status = 'in_progress', updated_at = NOW() WHERE id = $1`,
-      [merchantId]
-    );
-
-    // Mark all owners screening in progress
-    const ownersResult = await db.query(
-      `UPDATE merchant_owners SET screening_status = 'in_progress' WHERE merchant_id = $1 RETURNING id`,
-      [merchantId]
-    );
-
-    // Audit log
-    await db.query(
-      `INSERT INTO compliance_audit_log (merchant_id, action, actor, details, ip_address)
-       VALUES ($1, 'screening_triggered', $2, $3::jsonb, $4)`,
-      [merchantId, apiKey.public_key, JSON.stringify({
-        ownersScreened: ownersResult.rows.length,
-      }), clientIp]
-    );
-
-    return c.json({
-      merchantId,
-      ownersScreened: ownersResult.rows.length,
-      status: 'in_progress',
-    });
+    const result = await screenMerchant(db, merchantId, apiKey, clientIp);
+    return c.json(result);
   } catch (err: any) {
+    if (err.message === 'MERCHANT_NOT_FOUND') return c.json({ error: 'Merchant not found' }, 404);
     console.error('Screen merchant error:', err);
-    return c.json({ error: 'Failed to trigger screening', details: err.message }, 500);
+    return c.json({ error: 'Screening failed', details: err.message }, 500);
   }
+});
+
+// GET /v1/screening/stats — Sanctions list cache stats
+app.get('/v1/screening/stats', async (c) => {
+  const screener = SanctionsScreener.getInstance();
+  return c.json(screener.getStats());
 });
 
 export default app;
