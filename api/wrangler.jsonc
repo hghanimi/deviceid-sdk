@@ -17,12 +17,17 @@
 	},
 	"observability": {
 		"enabled": true
-	}
+	},
 	/**
-	 * Smart Placement
+	 * Smart Placement — routes Worker closer to Supabase (reduces DB latency)
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
 	 */
-	// "placement": {  "mode": "smart" }
+	"placement": { "mode": "smart" },
+	/**
+	 * TODO: Add Hyperdrive for connection pooling once created:
+	 * wrangler hyperdrive create athar-db --connection-string="$DATABASE_URL"
+	 * Then add: "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<hyperdrive-id>" }]
+	 */
 	/**
 	 * Bindings
 	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
@@ -36,6 +41,8 @@
 	 * https://developers.cloudflare.com/workers/configuration/secrets/
 	 */
 	// "vars": {  "MY_VARIABLE": "production_value" }
+	// Secrets (set via: wrangler secret put <NAME>):
+	// DATABASE_URL, OPENSANCTIONS_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY
 	/**
 	 * Service Bindings (communicate between multiple Workers)
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings

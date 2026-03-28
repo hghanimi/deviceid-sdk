@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Athar أثر — Compliance Dashboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8faf9;--surface:#ffffff;--surface-2:#f0f7f5;--border:#dce9e5;--border-2:#c2d8d1;
+  --text:#1a2e28;--text-2:#5a7a6f;--muted:#8da89e;
+  --brand:#0F6E56;--brand-light:#e6f5f0;--brand-dark:#0a5743;--brand-glow:rgba(15,110,86,.12);
+  --ok:#22c55e;--ok-bg:#f0fdf4;--warn:#f59e0b;--warn-bg:#fffbeb;
+  --danger:#ef4444;--danger-bg:#fef2f2;--orange:#f97316;--orange-bg:#fff7ed;
+  --radius:10px;--radius-lg:14px;
+  --font:'Inter',-apple-system,system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+a{color:var(--brand);text-decoration:none}
+
+/* ── Layout ── */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--brand-dark);color:#fff;padding:1.25rem 1rem;display:flex;flex-direction:column;gap:.5rem;position:fixed;top:0;left:0;height:100vh;z-index:50}
+.sidebar .logo{display:flex;align-items:center;gap:.6rem;padding:.5rem 0 1rem;border-bottom:1px solid rgba(255,255,255,.15);margin-bottom:.5rem}
+.logo-box{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#0F6E56,#34d399);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.logo-text{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.logo-sub{font-size:10px;opacity:.6;margin-top:1px}
+.nav-item{display:flex;align-items:center;gap:.55rem;padding:.55rem .7rem;border-radius:8px;font-size:13.5px;color:rgba(255,255,255,.75);cursor:pointer;transition:all .15s}
+.nav-item:hover,.nav-item.active{background:rgba(255,255,255,.12);color:#fff}
+.nav-item .icon{width:18px;text-align:center;font-size:15px}
+.sidebar-bottom{margin-top:auto;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.12)}
+.main{margin-left:220px;flex:1;padding:1.5rem 2rem 3rem}
+
+/* ── Top Bar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem;gap:1rem;flex-wrap:wrap}
+.topbar h1{font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+.topbar h1 span{color:var(--brand)}
+.api-key-box{display:flex;align-items:center;gap:.5rem}
+.api-key-box label{font-size:12px;color:var(--text-2);white-space:nowrap}
+.api-key-box input{font-family:var(--mono);font-size:12px;padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;width:220px;background:var(--surface);color:var(--text)}
+.api-key-box input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-glow)}
+
+/* ── Cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.3rem;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.teal::before{background:var(--brand)}.kpi.orange::before{background:var(--orange)}.kpi.red::before{background:var(--danger)}.kpi.green::before{background:var(--ok)}
+.kpi-label{font-size:12px;color:var(--text-2);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+.kpi-value{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.1}
+.kpi-sub{font-size:11.5px;color:var(--muted);margin-top:.3rem}
+
+/* ── Sections ── */
+.section{margin-bottom:2rem}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
+.section-title{font-size:16px;font-weight:700;letter-spacing:-.2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.badge-critical{background:#fecaca;color:#991b1b}.badge-high{background:#fed7aa;color:#9a3412}
+.badge-medium{background:#fef08a;color:#854d0e}.badge-low{background:#e5e7eb;color:#374151}
+.badge-open{background:#dbeafe;color:#1e40af}.badge-resolved{background:#d1fae5;color:#065f46}
+.badge-pending{background:#fef3c7;color:#92400e}.badge-approved{background:#d1fae5;color:#065f46}
+.badge-rejected{background:#fecaca;color:#991b1b}.badge-flagged{background:#fed7aa;color:#9a3412}
+.badge-clear{background:#d1fae5;color:#065f46}
+
+/* ── Panel ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.2rem;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.panel-header h3{font-size:14px;font-weight:600}
+.panel-body{padding:1rem 1.2rem}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:.6rem .8rem;background:var(--surface-2);color:var(--text-2);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+td{padding:.65rem .8rem;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-2)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .9rem;border-radius:7px;font-size:12.5px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn:hover{filter:brightness(.93)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-outline{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+.btn-outline:hover{background:var(--brand-light)}
+.btn-sm{padding:.3rem .65rem;font-size:11.5px}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-warn{background:var(--orange);color:#fff}
+
+/* ── Form ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.form-group{display:flex;flex-direction:column;gap:.25rem}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:12px;font-weight:600;color:var(--text-2)}
+.form-input{padding:.5rem .7rem;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text)}
+.form-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-glow)}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235a7a6f' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .7rem center;padding-right:2rem}
+
+/* ── Alerts List ── */
+.alert-card{display:flex;align-items:flex-start;gap:1rem;padding:.9rem 1rem;border-bottom:1px solid var(--border);transition:background .1s}
+.alert-card:last-child{border-bottom:none}
+.alert-card:hover{background:var(--surface-2)}
+.alert-sev{width:4px;border-radius:4px;align-self:stretch;flex-shrink:0}
+.alert-sev.critical{background:var(--danger)}.alert-sev.high{background:var(--orange)}.alert-sev.medium{background:var(--warn)}.alert-sev.low{background:#9ca3af}
+.alert-info{flex:1;min-width:0}
+.alert-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.alert-meta{font-size:11.5px;color:var(--text-2)}
+.alert-actions{display:flex;gap:.4rem;flex-shrink:0;align-items:center}
+
+/* ── Owners ── */
+.owner-block{border:1px solid var(--border);border-radius:8px;padding:.9rem;margin-bottom:.75rem;background:var(--surface-2);position:relative}
+.owner-block .remove-owner{position:absolute;top:.5rem;right:.5rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;line-height:1}
+
+/* ── Modal / Overlay ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:auto}
+.modal{background:var(--surface);border-radius:var(--radius-lg);padding:1.5rem;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:1rem}
+
+/* ── Toast ── */
+.toast-container{position:fixed;top:1rem;right:1rem;z-index:200;display:flex;flex-direction:column;gap:.5rem}
+.toast{padding:.7rem 1rem;border-radius:8px;font-size:13px;font-weight:500;color:#fff;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:slideIn .3s ease}
+.toast.success{background:#059669}.toast.error{background:#dc2626}.toast.info{background:#0284c7}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── Spinner ── */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+.spinner.dark{border-color:var(--border);border-top-color:var(--brand)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Tab nav ── */
+.tab-row{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.25rem}
+.tab{padding:.55rem 1.2rem;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab:hover{color:var(--text)}.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+.tab-page{display:none}.tab-page.active{display:block}
+
+/* ── Screening Results ── */
+.screen-result{margin-top:.75rem;padding:.8rem;background:var(--surface-2);border-radius:8px;font-size:12.5px}
+.match-item{padding:.4rem 0;border-bottom:1px dashed var(--border)}
+.match-item:last-child{border-bottom:none}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:13.5px}
+.empty .icon{font-size:32px;margin-bottom:.5rem}
+
+/* ── Documents ── */
+.doc-card{display:flex;align-items:flex-start;gap:1rem;padding:1rem;border-bottom:1px solid var(--border);transition:background .1s}
+.doc-card:last-child{border-bottom:none}
+.doc-card:hover{background:var(--surface-2)}
+.doc-thumb{width:56px;height:56px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;overflow:hidden}
+.doc-thumb img{width:100%;height:100%;object-fit:cover}
+.doc-info{flex:1;min-width:0}
+.doc-name{font-size:13px;font-weight:600;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-meta{font-size:11.5px;color:var(--text-2)}
+.doc-actions{display:flex;gap:.4rem;flex-shrink:0;align-items:center}
+.upload-zone{border:2px dashed var(--border-2);border-radius:var(--radius-lg);padding:2rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--brand);background:var(--brand-light)}
+.upload-zone .icon{font-size:32px;margin-bottom:.5rem}
+.upload-zone p{font-size:13px;color:var(--text-2);margin-top:.3rem}
+.badge-ocr_complete{background:#dbeafe;color:#1e40af}
+.badge-ocr_pending{background:#fef3c7;color:#92400e}
+.badge-ocr_failed{background:#fecaca;color:#991b1b}
+.badge-verified{background:#d1fae5;color:#065f46}
+.badge-unverified{background:#e5e7eb;color:#374151}
+.badge-rejected{background:#fecaca;color:#991b1b}
+.ocr-preview{margin-top:.5rem;padding:.6rem;background:var(--surface-2);border-radius:6px;font-size:11.5px;max-height:120px;overflow-y:auto}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  .sidebar{display:none}.main{margin-left:0;padding:1rem}
+  .form-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:500px){.kpi-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo">
+      <div class="logo-box">أ</div>
+      <div>
+        <div class="logo-text">Athar أثر</div>
+        <div class="logo-sub">Compliance Module</div>
+      </div>
+    </div>
+    <div class="nav-item active" data-tab="overview"><span class="icon">📊</span> Overview</div>
+    <div class="nav-item" data-tab="alerts"><span class="icon">🔔</span> Alerts</div>
+    <div class="nav-item" data-tab="merchants"><span class="icon">🏢</span> Merchants</div>
+    <div class="nav-item" data-tab="documents"><span class="icon">📄</span> Documents</div>
+    <div class="nav-item" data-tab="onboard"><span class="icon">➕</span> Onboard</div>
+    <div class="nav-item" data-tab="audit"><span class="icon">📋</span> Audit Trail</div>
+    <div class="sidebar-bottom">
+      <div class="nav-item" onclick="window.open('/','_self')"><span class="icon">←</span> Device Dashboard</div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <h1><span>Compliance</span> Dashboard</h1>
+      <div class="api-key-box">
+        <label>API Key</label>
+        <input type="password" id="apiKeyInput" placeholder="pk_live_athar_001" spellcheck="false">
+      </div>
+    </div>
+
+    <!-- Tab Pages -->
+    <!-- ══════════════ OVERVIEW ══════════════ -->
+    <div class="tab-page active" id="page-overview">
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi teal"><div class="kpi-label">Total Merchants</div><div class="kpi-value" id="kpi-total">—</div></div>
+        <div class="kpi orange"><div class="kpi-label">Pending Review</div><div class="kpi-value" id="kpi-pending">—</div><div class="kpi-sub" id="kpi-pending-sub"></div></div>
+        <div class="kpi red"><div class="kpi-label">Open Alerts</div><div class="kpi-value" id="kpi-alerts">—</div><div class="kpi-sub" id="kpi-alerts-sub"></div></div>
+        <div class="kpi green"><div class="kpi-label">Cleared Today</div><div class="kpi-value" id="kpi-cleared">—</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+        <div class="panel">
+          <div class="panel-header"><h3>Screening Summary</h3></div>
+          <div class="panel-body" id="screeningSummary">—</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><h3>Risk Distribution</h3></div>
+          <div class="panel-body" id="riskDist">—</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>Recent Activity</h3></div>
+        <div class="panel-body" id="recentActivity" style="max-height:340px;overflow-y:auto">
+          <div class="empty"><div class="icon">📋</div>Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ ALERTS ══════════════ -->
+    <div class="tab-page" id="page-alerts">
+      <div class="section-head">
+        <div class="section-title">Compliance Alerts</div>
+        <div style="display:flex;gap:.5rem">
+          <select class="form-input" id="alertFilterStatus" style="font-size:12px;padding:.35rem .6rem">
+            <option value="">All Status</option><option value="open">Open</option><option value="resolved">Resolved</option>
+          </select>
+          <select class="form-input" id="alertFilterSev" style="font-size:12px;padding:.35rem .6rem">
+            <option value="">All Severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadAlerts()">Refresh</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div id="alertsList"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ MERCHANTS ══════════════ -->
+    <div class="tab-page" id="page-merchants">
+      <div class="section-head">
+        <div class="section-title">Merchants</div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-primary btn-sm" onclick="switchTab('onboard')">+ New Merchant</button>
+          <button class="btn btn-outline btn-sm" onclick="loadMerchants()">Refresh</button>
+        </div>
+      </div>
+      <div class="panel" style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Merchant</th><th>KYC Status</th><th>Screening</th><th>Risk</th><th>Last Screened</th><th style="text-align:right">Actions</th></tr>
+          </thead>
+          <tbody id="merchantsBody">
+            <tr><td colspan="6" class="empty">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="screeningResultContainer"></div>
+    </div>
+
+    <!-- ══════════════ DOCUMENTS ══════════════ -->
+    <div class="tab-page" id="page-documents">
+      <div class="section-head">
+        <div class="section-title">KYC Documents</div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <select class="form-input" id="docMerchantSelect" style="font-size:12px;padding:.35rem .6rem;min-width:220px">
+            <option value="">Select Merchant...</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadDocuments()">Refresh</button>
+        </div>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="panel" style="margin-bottom:1rem">
+        <div class="panel-header"><h3>Upload Document</h3></div>
+        <div class="panel-body">
+          <div id="uploadZone" class="upload-zone" onclick="document.getElementById('docFileInput').click()">
+            <div class="icon">📤</div>
+            <strong>Click to upload or drag & drop</strong>
+            <p>JPEG, PNG, or PDF — max 10 MB</p>
+          </div>
+          <input type="file" id="docFileInput" accept=".jpg,.jpeg,.png,.pdf" style="display:none">
+          <div id="uploadForm" style="display:none;margin-top:1rem">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;padding:.6rem;background:var(--surface-2);border-radius:8px">
+              <span style="font-size:24px" id="uploadFileIcon">📄</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="uploadFileName"></div>
+                <div style="font-size:11.5px;color:var(--text-2)" id="uploadFileSize"></div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline" onclick="clearUpload()" style="color:var(--danger);border-color:var(--danger)">✕ Remove</button>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Document Type *</label>
+                <select class="form-input" id="uploadDocType">
+                  <option value="national_id">National ID / هوية وطنية</option>
+                  <option value="passport">Passport / جواز سفر</option>
+                  <option value="business_license">Business License / رخصة تجارية</option>
+                  <option value="resident_id">Resident ID / بطاقة سكن</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Owner (optional)</label>
+                <select class="form-input" id="uploadOwnerId">
+                  <option value="">— Merchant-level document —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Side</label>
+                <select class="form-input" id="uploadDocSide">
+                  <option value="front">Front / أمامي</option>
+                  <option value="back">Back / خلفي</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:.75rem">
+              <button class="btn btn-primary" id="uploadBtn" onclick="submitUpload()">📤 Upload Document</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documents List -->
+      <div class="panel">
+        <div class="panel-header"><h3>Documents</h3><span id="docCount" style="font-size:12px;color:var(--text-2)"></span></div>
+        <div id="docsList">
+          <div class="empty"><div class="icon">📄</div>Select a merchant to view documents</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ ONBOARD ══════════════ -->
+    <div class="tab-page" id="page-onboard">
+      <div class="panel">
+        <div class="panel-header"><h3>Merchant Onboarding</h3></div>
+        <div class="panel-body">
+          <form id="onboardForm" autocomplete="off">
+            <div class="form-grid" style="margin-bottom:1.25rem">
+              <div class="form-group">
+                <label class="form-label">Legal Name (Arabic) *</label>
+                <input class="form-input" name="legalNameAr" required placeholder="شركة الأثر للتكنولوجيا" dir="rtl">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Legal Name (English)</label>
+                <input class="form-input" name="legalNameEn" placeholder="Athar Technology LLC">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Trade Name</label>
+                <input class="form-input" name="tradeName" placeholder="Athar Tech">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Registration Number</label>
+                <input class="form-input" name="registrationNumber" placeholder="12345">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Business Type</label>
+                <select class="form-input" name="businessType">
+                  <option value="">Select...</option>
+                  <option value="llc">LLC / ش.ذ.م.م</option>
+                  <option value="sole_proprietor">Sole Proprietor / فردي</option>
+                  <option value="partnership">Partnership / شراكة</option>
+                  <option value="corporation">Corporation / شركة مساهمة</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Industry Code</label>
+                <input class="form-input" name="industryCode" placeholder="6201">
+              </div>
+              <div class="form-group">
+                <label class="form-label">City</label>
+                <input class="form-input" name="city" placeholder="Baghdad">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Governorate</label>
+                <select class="form-input" name="governorate">
+                  <option value="">Select...</option>
+                  <option>Baghdad</option><option>Basra</option><option>Erbil</option><option>Sulaymaniyah</option>
+                  <option>Duhok</option><option>Najaf</option><option>Karbala</option><option>Kirkuk</option>
+                  <option>Nineveh</option><option>Anbar</option><option>Diyala</option><option>Wasit</option>
+                  <option>Maysan</option><option>Dhi Qar</option><option>Muthanna</option><option>Qadisiyyah</option>
+                  <option>Babil</option><option>Saladin</option>
+                </select>
+              </div>
+              <div class="form-group full">
+                <label class="form-label">Address</label>
+                <input class="form-input" name="address" placeholder="الكرادة، شارع ٥٢" dir="rtl">
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+              <h4 style="font-size:14px;font-weight:700">Beneficial Owners / UBOs</h4>
+              <button type="button" class="btn btn-outline btn-sm" id="addOwnerBtn">+ Add Owner</button>
+            </div>
+            <div id="ownersContainer"></div>
+
+            <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+              <button type="reset" class="btn btn-outline">Reset</button>
+              <button type="submit" class="btn btn-primary" id="submitMerchantBtn">Submit for Review</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ AUDIT ══════════════ -->
+    <div class="tab-page" id="page-audit">
+      <div class="section-head">
+        <div class="section-title">Compliance Audit Trail</div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input type="date" class="form-input" id="auditFrom" style="font-size:12px;padding:.35rem .5rem">
+          <span style="color:var(--muted);font-size:12px">to</span>
+          <input type="date" class="form-input" id="auditTo" style="font-size:12px;padding:.35rem .5rem">
+          <button class="btn btn-outline btn-sm" onclick="loadAudit()">Filter</button>
+        </div>
+      </div>
+      <div class="panel" style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Details</th></tr></thead>
+          <tbody id="auditBody"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:center;gap:.5rem;margin-top:.75rem" id="auditPagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Resolve Modal -->
+<div class="modal-overlay" id="resolveModal">
+  <div class="modal">
+    <h3>Resolve Alert</h3>
+    <input type="hidden" id="resolveAlertId">
+    <div class="form-grid" style="margin-bottom:1rem">
+      <div class="form-group">
+        <label class="form-label">Resolution</label>
+        <select class="form-input" id="resolveStatus">
+          <option value="resolved">Resolved</option>
+          <option value="false_positive">False Positive</option>
+          <option value="escalated">Escalated</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Resolved By</label>
+        <input class="form-input" id="resolveBy" placeholder="Your name">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" id="resolveNotes" rows="3" placeholder="Resolution notes..." style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:.5rem">
+      <button class="btn btn-outline" onclick="closeResolveModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitResolve()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = 'https://api.arch-hayder.workers.dev';
+
+/* ── Helpers ── */
+function getKey() { return document.getElementById('apiKeyInput').value.trim(); }
+function headers() { return { 'x-api-key': getKey(), 'Content-Type': 'application/json' }; }
+
+async function api(path, opts = {}) {
+  const key = getKey();
+  if (!key) { toast('Enter your API key first', 'error'); throw new Error('No API key'); }
+  const h = { 'x-api-key': key };
+  if (opts.body && typeof opts.body === 'string') h['Content-Type'] = 'application/json';
+  const r = await fetch(API + path, { ...opts, headers: { ...h, ...opts.headers } });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error || `Error ${r.status}`, 'error'); throw new Error(d.error); }
+  return d;
+}
+
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function sevBadge(sev) { return `<span class="badge badge-${sev}">${sev}</span>`; }
+function statusBadge(st) { return `<span class="badge badge-${st || 'pending'}">${st || 'pending'}</span>`; }
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+/* ── Tabs ── */
+function switchTab(tab) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  if (tab === 'overview') loadDashboard();
+  if (tab === 'alerts') loadAlerts();
+  if (tab === 'merchants') loadMerchants();
+  if (tab === 'documents') loadDocumentsTab();
+  if (tab === 'audit') loadAudit();
+}
+document.querySelectorAll('.nav-item[data-tab]').forEach(n => n.addEventListener('click', () => switchTab(n.dataset.tab)));
+
+/* ── Dashboard Overview ── */
+async function loadDashboard() {
+  try {
+    const d = await api('/v1/compliance/dashboard');
+    document.getElementById('kpi-total').textContent = d.merchants.total;
+    document.getElementById('kpi-pending').textContent = d.merchants.pending + d.merchants.underReview;
+    document.getElementById('kpi-pending-sub').textContent = `${d.merchants.pending} pending · ${d.merchants.underReview} under review`;
+    document.getElementById('kpi-alerts').textContent = d.alerts.open;
+    document.getElementById('kpi-alerts-sub').textContent = `${d.alerts.critical} critical · ${d.alerts.high} high`;
+    document.getElementById('kpi-cleared').textContent = d.screening.clearedToday;
+
+    document.getElementById('screeningSummary').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:13px">
+        <div><span style="color:var(--text-2)">Total Screened</span><br><strong>${d.screening.totalScreened}</strong></div>
+        <div><span style="color:var(--text-2)">Pending Review</span><br><strong>${d.screening.pendingReview}</strong></div>
+        <div><span style="color:var(--text-2)">Matches Found</span><br><strong style="color:var(--danger)">${d.screening.matchesFound}</strong></div>
+        <div><span style="color:var(--text-2)">Owners</span><br><strong>${d.owners.total}</strong> (${d.owners.pepMatches} PEP, ${d.owners.sanctionMatches} sanctions)</div>
+      </div>`;
+
+    const r = d.riskDistribution;
+    const total = (r.high + r.medium + r.low) || 1;
+    document.getElementById('riskDist').innerHTML = `
+      <div style="display:flex;gap:.5rem;margin-bottom:.75rem;height:8px;border-radius:4px;overflow:hidden;background:var(--border)">
+        <div style="width:${(r.high/total)*100}%;background:var(--danger)"></div>
+        <div style="width:${(r.medium/total)*100}%;background:var(--warn)"></div>
+        <div style="width:${(r.low/total)*100}%;background:var(--ok)"></div>
+      </div>
+      <div style="display:flex;gap:1.5rem;font-size:13px">
+        <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-right:4px"></span>High: <strong>${r.high}</strong></div>
+        <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:4px"></span>Medium: <strong>${r.medium}</strong></div>
+        <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:4px"></span>Low: <strong>${r.low}</strong></div>
+      </div>`;
+
+    const ra = d.recentActivity || [];
+    if (ra.length === 0) {
+      document.getElementById('recentActivity').innerHTML = '<div class="empty"><div class="icon">📋</div>No recent activity</div>';
+    } else {
+      document.getElementById('recentActivity').innerHTML = ra.map(a => `
+        <div style="display:flex;align-items:center;gap:.75rem;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:12.5px">
+          <span style="color:var(--muted);flex-shrink:0;width:90px">${timeAgo(a.created_at)}</span>
+          <span style="font-weight:600">${escapeHtml(a.action)}</span>
+          <span style="color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(a.actor || '')}</span>
+        </div>`).join('');
+    }
+  } catch (e) { console.error(e); }
+}
+
+/* ── Alerts ── */
+async function loadAlerts() {
+  const status = document.getElementById('alertFilterStatus').value;
+  const sev = document.getElementById('alertFilterSev').value;
+  let qs = '?';
+  if (status) qs += `status=${status}&`;
+  if (sev) qs += `severity=${sev}&`;
+  try {
+    const d = await api('/v1/compliance/alerts' + qs);
+    const list = d.alerts || [];
+    if (list.length === 0) {
+      document.getElementById('alertsList').innerHTML = '<div class="empty"><div class="icon">✅</div>No alerts found</div>';
+      return;
+    }
+    document.getElementById('alertsList').innerHTML = list.map(a => `
+      <div class="alert-card">
+        <div class="alert-sev ${a.severity}"></div>
+        <div class="alert-info">
+          <div class="alert-title">${escapeHtml(a.legal_name_ar || a.legal_name_en || 'Unknown')} — ${escapeHtml(a.alert_type)}</div>
+          <div class="alert-meta">
+            ${sevBadge(a.severity)} ${statusBadge(a.status)}
+            · ${escapeHtml(a.owner_name_ar || a.owner_name_en || '')}
+            · ${timeAgo(a.created_at)}
+            ${a.details?.matchedName ? ` · Matched: <strong>${escapeHtml(a.details.matchedName)}</strong> (${(a.details.matchScore * 100).toFixed(0)}%)` : ''}
+            ${a.details?.message ? ` · ${escapeHtml(a.details.message)}` : ''}
+          </div>
+        </div>
+        <div class="alert-actions">
+          ${a.status === 'open' ? `<button class="btn btn-sm btn-primary" onclick="openResolveModal('${a.id}')">Resolve</button>` : `<span style="font-size:11px;color:var(--muted)">${escapeHtml(a.resolved_by || '')}</span>`}
+        </div>
+      </div>`).join('');
+  } catch (e) { document.getElementById('alertsList').innerHTML = '<div class="empty">Failed to load alerts</div>'; }
+}
+
+function openResolveModal(alertId) {
+  document.getElementById('resolveAlertId').value = alertId;
+  document.getElementById('resolveNotes').value = '';
+  document.getElementById('resolveBy').value = '';
+  document.getElementById('resolveModal').classList.add('show');
+}
+function closeResolveModal() { document.getElementById('resolveModal').classList.remove('show'); }
+
+async function submitResolve() {
+  const alertId = document.getElementById('resolveAlertId').value;
+  const status = document.getElementById('resolveStatus').value;
+  const notes = document.getElementById('resolveNotes').value;
+  const by = document.getElementById('resolveBy').value;
+  try {
+    await api(`/v1/compliance/alerts/${alertId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, resolution_notes: notes, resolved_by: by || undefined }),
+    });
+    toast('Alert resolved', 'success');
+    closeResolveModal();
+    loadAlerts();
+    loadDashboard();
+  } catch (e) { /* toast shown by api() */ }
+}
+
+/* ── Merchants ── */
+async function loadMerchants() {
+  try {
+    const d = await api('/v1/merchants');
+    const list = d.merchants || [];
+    if (list.length === 0) {
+      document.getElementById('merchantsBody').innerHTML = '<tr><td colspan="6" class="empty"><div class="icon">🏢</div>No merchants yet</td></tr>';
+      return;
+    }
+    document.getElementById('merchantsBody').innerHTML = list.map(m => `
+      <tr>
+        <td>
+          <div style="font-weight:600">${escapeHtml(m.legal_name_ar || '')}</div>
+          <div style="font-size:11.5px;color:var(--text-2)">${escapeHtml(m.legal_name_en || '')} ${m.registration_number ? '· #' + escapeHtml(m.registration_number) : ''}</div>
+        </td>
+        <td>${statusBadge(m.kyc_status)}</td>
+        <td>${statusBadge(m.screening_status)}</td>
+        <td>${m.risk_rating ? statusBadge(m.risk_rating) : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="font-size:12px;color:var(--text-2)">${m.last_screened_at ? timeAgo(m.last_screened_at) : '<span style="color:var(--muted)">Never</span>'}</td>
+        <td style="text-align:right">
+          <button class="btn btn-sm btn-outline" onclick="screenMerchant('${m.id}', this)">Screen Now</button>
+        </td>
+      </tr>`).join('');
+  } catch (e) { document.getElementById('merchantsBody').innerHTML = '<tr><td colspan="6" class="empty">Failed to load</td></tr>'; }
+}
+
+async function screenMerchant(id, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  const container = document.getElementById('screeningResultContainer');
+  try {
+    const d = await api(`/v1/merchants/${id}/screen`, { method: 'POST' });
+    toast(`Screening complete: ${d.screeningStatus}`, d.screeningStatus === 'clear' ? 'success' : 'error');
+    // Show results
+    const ownerHtml = (d.ownerResults || []).map(o => {
+      const matches = (o.matches || []).map(m =>
+        `<div class="match-item">
+          <strong>${escapeHtml(m.matchedName)}</strong> — ${escapeHtml(m.listSource)} · Score: ${(m.score * 100).toFixed(1)}%
+          ${m.programs ? ` · ${escapeHtml(m.programs.join(', '))}` : ''}
+        </div>`).join('');
+      return `<div style="margin-bottom:.5rem"><strong>${escapeHtml(o.ownerName)}</strong>: ${o.status} (${o.matches?.length || 0} matches)${matches ? '<div style="margin-left:1rem">' + matches + '</div>' : ''}</div>`;
+    }).join('');
+    container.innerHTML = `
+      <div class="panel" style="margin-top:1rem">
+        <div class="panel-header"><h3>Screening Result — ${statusBadge(d.screeningStatus)}</h3></div>
+        <div class="panel-body">
+          <div style="font-size:13px;margin-bottom:.75rem">
+            <strong>Merchant Matches:</strong> ${d.merchantMatches?.length || 0} ·
+            <strong>Alerts Created:</strong> ${d.alertsCreated || 0} ·
+            <strong>Sources:</strong> ${(d.sources || []).join(', ')} ·
+            <strong>Screened:</strong> ${fmtDate(d.screenedAt)}
+          </div>
+          ${ownerHtml || '<div style="color:var(--muted);font-size:13px">No owner results</div>'}
+        </div>
+      </div>`;
+    loadMerchants();
+  } catch (e) {
+    container.innerHTML = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Screen Now';
+  }
+}
+
+/* ── Onboard Form ── */
+let ownerCount = 0;
+function addOwnerBlock() {
+  ownerCount++;
+  const div = document.createElement('div');
+  div.className = 'owner-block';
+  div.id = `owner-${ownerCount}`;
+  div.innerHTML = `
+    <button type="button" class="remove-owner" onclick="this.parentElement.remove()">✕</button>
+    <div style="font-size:12px;font-weight:700;color:var(--brand);margin-bottom:.5rem">Owner #${ownerCount}</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Full Name (Arabic) *</label>
+        <input class="form-input owner-field" data-field="fullNameAr" required placeholder="أحمد محمد حسين" dir="rtl">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Name (English)</label>
+        <input class="form-input owner-field" data-field="fullNameEn" placeholder="Ahmed Mohammed Hussein">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date of Birth</label>
+        <input type="date" class="form-input owner-field" data-field="dateOfBirth">
+      </div>
+      <div class="form-group">
+        <label class="form-label">National ID</label>
+        <input class="form-input owner-field" data-field="nationalId" placeholder="12345678">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ownership %</label>
+        <input type="number" class="form-input owner-field" data-field="ownershipPct" min="0" max="100" placeholder="51">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nationality</label>
+        <input class="form-input owner-field" data-field="nationality" placeholder="Iraqi" value="Iraqi">
+      </div>
+    </div>`;
+  document.getElementById('ownersContainer').appendChild(div);
+}
+
+document.getElementById('addOwnerBtn').addEventListener('click', addOwnerBlock);
+// Start with one owner
+addOwnerBlock();
+
+document.getElementById('onboardForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitMerchantBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Submitting...';
+
+  const f = new FormData(this);
+  const owners = [];
+  document.querySelectorAll('.owner-block').forEach(block => {
+    const owner = {};
+    block.querySelectorAll('.owner-field').forEach(input => {
+      if (input.value.trim()) owner[input.dataset.field] = input.value.trim();
+    });
+    if (owner.fullNameAr) owners.push(owner);
+  });
+
+  const body = {
+    legalNameAr: f.get('legalNameAr'),
+    legalNameEn: f.get('legalNameEn') || undefined,
+    tradeName: f.get('tradeName') || undefined,
+    registrationNumber: f.get('registrationNumber') || undefined,
+    businessType: f.get('businessType') || undefined,
+    industryCode: f.get('industryCode') || undefined,
+    city: f.get('city') || undefined,
+    governorate: f.get('governorate') || undefined,
+    address: f.get('address') || undefined,
+    owners,
+  };
+
+  try {
+    const d = await api('/v1/merchants', { method: 'POST', body: JSON.stringify(body) });
+    toast('Merchant created! ID: ' + (d.merchant?.id || 'ok'), 'success');
+    this.reset();
+    document.getElementById('ownersContainer').innerHTML = '';
+    ownerCount = 0;
+    addOwnerBlock();
+    switchTab('merchants');
+  } catch (e) { /* toast shown */ }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Submit for Review';
+  }
+});
+
+/* ── Documents ── */
+let selectedDocFile = null;
+
+async function loadDocumentsTab() {
+  // Populate merchant dropdown
+  try {
+    const d = await api('/v1/merchants');
+    const sel = document.getElementById('docMerchantSelect');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select Merchant...</option>';
+    (d.merchants || []).forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = (m.legal_name_ar || '') + (m.legal_name_en ? ' — ' + m.legal_name_en : '');
+      sel.appendChild(opt);
+    });
+    if (cur) { sel.value = cur; loadDocuments(); }
+  } catch (e) {}
+}
+
+document.getElementById('docMerchantSelect').addEventListener('change', function() {
+  if (this.value) { loadDocuments(); loadOwnerOptions(this.value); }
+  else { document.getElementById('docsList').innerHTML = '<div class="empty"><div class="icon">📄</div>Select a merchant to view documents</div>'; }
+});
+
+async function loadOwnerOptions(merchantId) {
+  try {
+    const d = await api(`/v1/merchants/${merchantId}`);
+    const sel = document.getElementById('uploadOwnerId');
+    sel.innerHTML = '<option value="">— Merchant-level document —</option>';
+    (d.merchant?.owners || d.owners || []).forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = (o.full_name_ar || '') + (o.full_name_en ? ' — ' + o.full_name_en : '');
+      sel.appendChild(opt);
+    });
+  } catch (e) {}
+}
+
+async function loadDocuments() {
+  const mid = document.getElementById('docMerchantSelect').value;
+  if (!mid) return;
+  try {
+    const d = await api(`/v1/merchants/${mid}/documents`);
+    const docs = d.documents || [];
+    document.getElementById('docCount').textContent = docs.length + ' document' + (docs.length !== 1 ? 's' : '');
+    if (docs.length === 0) {
+      document.getElementById('docsList').innerHTML = '<div class="empty"><div class="icon">📄</div>No documents uploaded yet</div>';
+      return;
+    }
+    document.getElementById('docsList').innerHTML = docs.map(doc => {
+      const isImage = (doc.mime_type || '').startsWith('image/');
+      const thumbHtml = isImage && doc.file_url
+        ? `<img src="${escapeHtml(doc.file_url)}" alt="">`
+        : doc.mime_type === 'application/pdf' ? '📋' : '📄';
+      const ocrBadge = doc.ocr_status === 'completed' ? '<span class="badge badge-ocr_complete">OCR ✓</span>'
+        : doc.ocr_status === 'processing' ? '<span class="badge badge-ocr_pending">OCR ⏳</span>'
+        : doc.ocr_status === 'failed' ? '<span class="badge badge-ocr_failed">OCR ✗</span>'
+        : '<span class="badge badge-ocr_pending">OCR ⏳</span>';
+      const verBadge = statusBadge(doc.verification_status || 'unverified');
+      const typeBadge = `<span class="badge badge-open">${escapeHtml(doc.doc_type || '').replace('_', ' ')}</span>`;
+      const sideBadge = doc.doc_side ? `<span class="badge" style="background:#e0e7ff;color:#3730a3">${doc.doc_side}</span>` : '';
+
+      let ocrHtml = '';
+      if (doc.ocr_result && doc.ocr_status === 'completed' && doc.ocr_result.extraction) {
+        const fields = doc.ocr_result.extraction;
+        const skipKeys = new Set(['doc_type', 'doc_side']);
+        const mrzKeys = new Set(['mrz_line_1', 'mrz_line_2', 'mrz_line_3']);
+        const entries = Object.entries(fields)
+          .filter(([k, v]) => {
+            if (skipKeys.has(k)) return false;
+            if (v === null || v === undefined) return false;
+            if (typeof v === 'object' && (v.value === null || v.value === undefined || v.value === '')) return false;
+            return true;
+          })
+          .sort((a, b) => {
+            // Push MRZ lines to the bottom
+            const aIsMrz = mrzKeys.has(a[0]) ? 1 : 0;
+            const bIsMrz = mrzKeys.has(b[0]) ? 1 : 0;
+            return aIsMrz - bIsMrz;
+          });
+        if (entries.length) {
+          const mainEntries = entries.filter(([k]) => !mrzKeys.has(k));
+          const mrzEntries = entries.filter(([k]) => mrzKeys.has(k));
+          const formatEntry = ([k, v]) => {
+            const val = typeof v === 'object' ? v.value : v;
+            const conf = typeof v === 'object' && v.confidence ? ` <span style="opacity:.5">(${Math.round(v.confidence*100)}%)</span>` : '';
+            return `<span style="color:var(--text-2)">${escapeHtml(k.replace(/_/g, ' '))}:</span> ${escapeHtml(String(val))}${conf}`;
+          };
+          let ocrBody = mainEntries.map(formatEntry).join('<br>');
+          if (mrzEntries.length) {
+            ocrBody += '<br><details style="margin-top:4px"><summary style="font-size:10px;color:var(--muted);cursor:pointer">MRZ Data (' + mrzEntries.length + ' lines)</summary>' +
+              '<div style="font-family:monospace;font-size:10px;margin-top:2px">' + mrzEntries.map(formatEntry).join('<br>') + '</div></details>';
+          }
+          ocrHtml = '<div class="ocr-preview"><strong style="font-size:11px;color:var(--brand)">OCR Extracted:</strong><br>' + ocrBody + '</div>';
+        }
+      }
+      if (doc.ocr_result && doc.ocr_status === 'failed' && doc.ocr_result.error) {
+        ocrHtml = `<div class="ocr-preview" style="border-left:3px solid var(--danger);color:var(--danger)"><strong>OCR Error:</strong> ${escapeHtml(doc.ocr_result.error.substring(0, 200))}</div>`;
+      }
+
+      let validationHtml = '';
+      if (doc.validation_report && doc.validation_report.issues && doc.validation_report.issues.length > 0) {
+        validationHtml = '<div class="ocr-preview" style="border-left:3px solid var(--warn)"><strong style="font-size:11px;color:var(--warn)">Validation Issues:</strong><br>' +
+          doc.validation_report.issues.map(i => `<span class="badge badge-${i.severity}">${i.severity}</span> ${escapeHtml(i.message)}`).join('<br>') + '</div>';
+      }
+
+      const retryOcrBtn = (doc.ocr_status === 'failed' || doc.ocr_status === 'pending') && doc.file_size > 100
+        ? `<button class="btn btn-sm btn-warn" onclick="retryOcr('${doc.id}', this)">🔄 OCR</button>` : '';
+      const verifyBtns = (doc.verification_status !== 'verified' && doc.verification_status !== 'rejected')
+        ? `<button class="btn btn-sm btn-primary" onclick="verifyDoc('${doc.id}','verified')">✓ Verify</button>
+           <button class="btn btn-sm btn-danger" onclick="verifyDoc('${doc.id}','rejected')">✗ Reject</button>`
+        : `<span style="font-size:11px;color:var(--muted)">${doc.verified_by ? 'by ' + escapeHtml(doc.verified_by) : ''}</span>`;
+
+      return `<div class="doc-card">
+        <div class="doc-thumb">${thumbHtml}</div>
+        <div class="doc-info">
+          <div class="doc-name">${escapeHtml(doc.file_name || 'Document')}</div>
+          <div class="doc-meta">
+            ${typeBadge} ${sideBadge} ${verBadge} ${ocrBadge}
+            · ${doc.file_size ? (doc.file_size / 1024).toFixed(1) + ' KB' : ''}
+            · ${timeAgo(doc.created_at)}
+            ${doc.owner_id ? ' · Owner: ' + escapeHtml(doc.owner_name_ar || doc.owner_id.slice(0,8)) : ''}
+          </div>
+          ${ocrHtml}
+          ${validationHtml}
+        </div>
+        <div class="doc-actions">
+          ${doc.file_url ? `<a href="${escapeHtml(doc.file_url)}" target="_blank" class="btn btn-sm btn-outline">View</a>` : ''}
+          ${retryOcrBtn}
+          ${verifyBtns}
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('docsList').innerHTML = '<div class="empty">Failed to load documents</div>';
+  }
+}
+
+// File input & drag-and-drop
+const uploadZone = document.getElementById('uploadZone');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files[0]);
+});
+
+document.getElementById('docFileInput').addEventListener('change', function() {
+  if (this.files.length) handleFileSelect(this.files[0]);
+});
+
+function handleFileSelect(file) {
+  const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
+  if (!allowed.includes(file.type)) { toast('Only JPEG, PNG, or PDF files are allowed', 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('File must be under 10 MB', 'error'); return; }
+  selectedDocFile = file;
+  document.getElementById('uploadFileName').textContent = file.name;
+  document.getElementById('uploadFileSize').textContent = (file.size / 1024).toFixed(1) + ' KB · ' + file.type;
+  document.getElementById('uploadFileIcon').textContent = file.type === 'application/pdf' ? '📋' : '🖼️';
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('uploadForm').style.display = 'block';
+}
+
+function clearUpload() {
+  selectedDocFile = null;
+  document.getElementById('docFileInput').value = '';
+  document.getElementById('uploadZone').style.display = '';
+  document.getElementById('uploadForm').style.display = 'none';
+}
+
+async function submitUpload() {
+  const mid = document.getElementById('docMerchantSelect').value;
+  if (!mid) { toast('Select a merchant first', 'error'); return; }
+  if (!selectedDocFile) { toast('Select a file first', 'error'); return; }
+
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Uploading...';
+
+  const fd = new FormData();
+  fd.append('file', selectedDocFile);
+  fd.append('docType', document.getElementById('uploadDocType').value);
+  const ownerId = document.getElementById('uploadOwnerId').value;
+  if (ownerId) fd.append('ownerId', ownerId);
+  fd.append('docSide', document.getElementById('uploadDocSide').value);
+
+  try {
+    const key = getKey();
+    if (!key) { toast('Enter API key first', 'error'); return; }
+    const r = await fetch(API + `/v1/merchants/${mid}/documents`, {
+      method: 'POST',
+      headers: { 'x-api-key': key },
+      body: fd
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Upload failed', 'error'); return; }
+    toast('Document uploaded successfully!', 'success');
+    clearUpload();
+    loadDocuments();
+  } catch (e) {
+    toast('Upload failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📤 Upload Document';
+  }
+}
+
+async function verifyDoc(docId, status) {
+  const actor = prompt(status === 'verified' ? 'Verified by (your name):' : 'Rejected by (your name):');
+  if (actor === null) return;
+  try {
+    await api(`/v1/documents/${docId}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: status, reason: actor ? `${status} by ${actor}` : undefined })
+    });
+    toast(`Document ${status}`, 'success');
+    loadDocuments();
+  } catch (e) {}
+}
+
+async function retryOcr(docId, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner dark"></span>';
+  try {
+    await api(`/v1/documents/${docId}/ocr`, { method: 'POST' });
+    toast('OCR processing started — refresh in a few seconds', 'info');
+    setTimeout(() => loadDocuments(), 5000);
+  } catch (e) {}
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔄 OCR';
+  }
+}
+
+/* ── Audit Trail ── */
+let auditPage = 1;
+async function loadAudit(page) {
+  auditPage = page || 1;
+  let qs = `?page=${auditPage}`;
+  const from = document.getElementById('auditFrom').value;
+  const to = document.getElementById('auditTo').value;
+  if (from) qs += `&from=${from}`;
+  if (to) qs += `&to=${to}`;
+  try {
+    const d = await api('/v1/compliance/audit' + qs);
+    const rows = d.audit || [];
+    if (rows.length === 0) {
+      document.getElementById('auditBody').innerHTML = '<tr><td colspan="4" class="empty">No audit entries</td></tr>';
+      document.getElementById('auditPagination').innerHTML = '';
+      return;
+    }
+    document.getElementById('auditBody').innerHTML = rows.map(a => {
+      const det = a.details || {};
+      const detStr = Object.entries(det).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ');
+      return `<tr>
+        <td style="white-space:nowrap;font-size:12px">${fmtDate(a.created_at)}</td>
+        <td><span class="badge badge-open">${escapeHtml(a.action)}</span></td>
+        <td style="font-size:12.5px">${escapeHtml(a.actor || '—')}</td>
+        <td style="font-size:12px;color:var(--text-2);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(detStr)}">${escapeHtml(detStr)}</td>
+      </tr>`;
+    }).join('');
+    const p = d.pagination;
+    let pagHtml = '';
+    for (let i = 1; i <= p.totalPages; i++) {
+      pagHtml += `<button class="btn btn-sm ${i === p.page ? 'btn-primary' : 'btn-outline'}" onclick="loadAudit(${i})">${i}</button>`;
+    }
+    document.getElementById('auditPagination').innerHTML = pagHtml;
+  } catch (e) { document.getElementById('auditBody').innerHTML = '<tr><td colspan="4" class="empty">Failed to load</td></tr>'; }
+}
+
+/* ── Init ── */
+const savedKey = localStorage.getItem('athar_compliance_key');
+if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+document.getElementById('apiKeyInput').addEventListener('change', function() {
+  localStorage.setItem('athar_compliance_key', this.value);
+  loadDashboard();
+});
+// Auto-load if key exists
+if (getKey()) { loadDashboard(); }
+
+document.getElementById('alertFilterStatus').addEventListener('change', loadAlerts);
+document.getElementById('alertFilterSev').addEventListener('change', loadAlerts);
+</script>
+</body>
+</html>

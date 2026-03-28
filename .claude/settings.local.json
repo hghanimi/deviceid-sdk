@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/\"Global Pc\"/OneDrive/Desktop/deviceid-sdk/api)",
+      "Bash(npx tsc:*)",
+      "Bash(wc -l /c/Users/\"Global Pc\"/OneDrive/Desktop/deviceid-sdk/api/src/index.ts /c/Users/\"Global Pc\"/OneDrive/Desktop/deviceid-sdk/api/src/routes/*.ts)",
+      "Bash(npm run:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "claude-flow"
+  ]
+}

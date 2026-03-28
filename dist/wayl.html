@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wayl.io — لوحة التاجر | Merchant Portal</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f6f8fb;--surface:#ffffff;--surface-2:#f0f4f8;--border:#dde4ed;--border-2:#c2cedb;
+  --text:#1a2333;--text-2:#5a6b82;--muted:#8a9bb5;
+  --brand:#2563eb;--brand-light:#eff6ff;--brand-dark:#1e40af;--brand-glow:rgba(37,99,235,.12);
+  --ok:#22c55e;--ok-bg:#f0fdf4;--warn:#f59e0b;--warn-bg:#fffbeb;
+  --danger:#ef4444;--danger-bg:#fef2f2;--orange:#f97316;--orange-bg:#fff7ed;
+  --radius:10px;--radius-lg:14px;
+  --font:'Inter',-apple-system,system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+a{color:var(--brand);text-decoration:none}
+
+/* ── Layout ── */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:230px;background:var(--brand-dark);color:#fff;padding:1.25rem 1rem;display:flex;flex-direction:column;gap:.5rem;position:fixed;top:0;right:0;height:100vh;z-index:50}
+.sidebar .logo{display:flex;align-items:center;gap:.6rem;padding:.5rem 0 1rem;border-bottom:1px solid rgba(255,255,255,.15);margin-bottom:.5rem}
+.logo-box{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#2563eb,#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff}
+.logo-text{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.logo-sub{font-size:10px;opacity:.6;margin-top:1px}
+.nav-item{display:flex;align-items:center;gap:.55rem;padding:.55rem .7rem;border-radius:8px;font-size:13.5px;color:rgba(255,255,255,.75);cursor:pointer;transition:all .15s}
+.nav-item:hover,.nav-item.active{background:rgba(255,255,255,.12);color:#fff}
+.nav-item .icon{width:18px;text-align:center;font-size:15px}
+.sidebar-bottom{margin-top:auto;padding-top:.75rem;border-top:1px solid rgba(255,255,255,.12)}
+.main{margin-right:230px;flex:1;padding:1.5rem 2rem 3rem}
+
+/* ── Top Bar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem;gap:1rem;flex-wrap:wrap}
+.topbar h1{font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+.topbar h1 span{color:var(--brand)}
+.api-key-box{display:flex;align-items:center;gap:.5rem}
+.api-key-box label{font-size:12px;color:var(--text-2);white-space:nowrap}
+.api-key-box input{font-family:var(--mono);font-size:12px;padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;width:220px;background:var(--surface);color:var(--text);direction:ltr;text-align:left}
+.api-key-box input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-glow)}
+
+/* ── KPI Cards ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.3rem;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.blue::before{background:var(--brand)}.kpi.orange::before{background:var(--orange)}.kpi.red::before{background:var(--danger)}.kpi.green::before{background:var(--ok)}.kpi.warn::before{background:var(--warn)}
+.kpi-label{font-size:12px;color:var(--text-2);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+.kpi-value{font-size:28px;font-weight:700;letter-spacing:-.5px;line-height:1.1}
+.kpi-sub{font-size:11.5px;color:var(--muted);margin-top:.3rem}
+
+/* ── Sections ── */
+.section{margin-bottom:2rem}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem}
+.section-title{font-size:16px;font-weight:700;letter-spacing:-.2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-under_review{background:#dbeafe;color:#1e40af}
+.badge-approved{background:#d1fae5;color:#065f46}
+.badge-rejected{background:#fecaca;color:#991b1b}
+.badge-clear{background:#d1fae5;color:#065f46}
+.badge-hit{background:#fecaca;color:#991b1b}
+
+/* ── Panel ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.2rem;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.panel-header h3{font-size:14px;font-weight:600}
+.panel-body{padding:1rem 1.2rem}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:right;padding:.6rem .8rem;background:var(--surface-2);color:var(--text-2);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)}
+td{padding:.65rem .8rem;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-2)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .9rem;border-radius:7px;font-size:12.5px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn:hover{filter:brightness(.93)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-success{background:var(--ok);color:#fff}
+.btn-warn{background:var(--warn);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--brand);color:var(--brand)}
+.btn-sm{padding:.3rem .6rem;font-size:11.5px}
+.btn-lg{padding:.65rem 1.3rem;font-size:14px;border-radius:10px}
+
+/* ── Modal ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;align-items:center;justify-content:center}
+.modal-backdrop.show{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);width:680px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-head{padding:1rem 1.4rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-head h2{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px}
+.modal-body{padding:1.4rem}
+.modal-foot{padding:.75rem 1.4rem;border-top:1px solid var(--border);display:flex;gap:.5rem;justify-content:flex-start}
+
+/* ── Form ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem 1.25rem}
+.form-grid.cols-3{grid-template-columns:1fr 1fr 1fr}
+.form-group{display:flex;flex-direction:column;gap:.25rem}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:11.5px;font-weight:600;color:var(--text-2)}
+.form-group label .req{color:var(--danger);margin-right:2px}
+.form-group input,.form-group select,.form-group textarea{padding:.5rem .7rem;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:var(--font);color:var(--text);background:var(--surface);transition:border .15s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-glow)}
+
+/* ── Doc Upload ── */
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem}
+.doc-card{border:2px dashed var(--border-2);border-radius:var(--radius);padding:1rem;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.doc-card:hover{border-color:var(--brand);background:var(--brand-light)}
+.doc-card.uploaded{border-color:var(--ok);border-style:solid;background:var(--ok-bg)}
+.doc-card.uploading{border-color:var(--warn);opacity:.7;pointer-events:none}
+.doc-card .doc-icon{font-size:28px;margin-bottom:.4rem}
+.doc-card .doc-label{font-size:12px;font-weight:600;color:var(--text)}
+.doc-card .doc-sub{font-size:10px;color:var(--muted);margin-top:.2rem}
+.doc-card .doc-status{font-size:10px;font-weight:600;margin-top:.4rem}
+.doc-card .doc-status.ok{color:var(--ok)}.doc-card .doc-status.pending{color:var(--warn)}.doc-card .doc-status.error{color:var(--danger)}
+.doc-card input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* ── Detail Pane ── */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:13px}
+.detail-row{display:flex;gap:.5rem;padding:.35rem 0;border-bottom:1px solid #eee}
+.detail-label{font-weight:600;color:var(--text-2);min-width:130px;flex-shrink:0}
+.detail-value{color:var(--text)}
+.detail-value.missing{color:var(--danger);font-style:italic}
+
+/* ── Progress Bar ── */
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:var(--brand);border-radius:4px;transition:width .3s ease}
+
+/* ── Empty State ── */
+.empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty .icon{font-size:48px;margin-bottom:.5rem}
+.empty p{font-size:14px;margin-bottom:1rem}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);padding:.6rem 1.2rem;border-radius:8px;font-size:13px;font-weight:600;color:#fff;background:var(--brand);z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.toast.error{background:var(--danger)}
+.toast.success{background:var(--ok)}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main{margin-right:0}
+  .form-grid,.form-grid.cols-3{grid-template-columns:1fr}
+  .doc-grid{grid-template-columns:1fr 1fr}
+}
+
+.hidden{display:none!important}
+.loading{opacity:.5;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-box">W</div>
+    <div>
+      <div class="logo-text">Wayl.io</div>
+      <div class="logo-sub">بوابة التاجر</div>
+    </div>
+  </div>
+  <div class="nav-item active" data-tab="dashboard"><span class="icon">📊</span> لوحة القيادة</div>
+  <div class="nav-item" data-tab="merchants"><span class="icon">🏢</span> التجار</div>
+  <div class="nav-item" data-tab="documents"><span class="icon">📄</span> المستندات</div>
+  <div class="nav-item" data-tab="activity"><span class="icon">📋</span> سجل النشاط</div>
+  <div class="sidebar-bottom">
+    <div class="nav-item" onclick="window.open('kyc.html','_blank')"><span class="icon">📝</span> استمارة KYC</div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <h1>مرحباً بك في <span>Wayl.io</span></h1>
+    <div class="api-key-box">
+      <label>مفتاح API</label>
+      <input type="text" id="apiKey" placeholder="pk_live_wayl_001" value="pk_live_wayl_001">
+      <button class="btn btn-primary btn-sm" onclick="loadDashboard()">تحميل</button>
+    </div>
+  </div>
+
+  <!-- Tab: Dashboard -->
+  <div id="tab-dashboard">
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">التجار</div>
+        <button class="btn btn-primary" onclick="openNewMerchantModal()">+ تاجر جديد</button>
+      </div>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>التاجر</th>
+              <th>الاسم التجاري</th>
+              <th>حالة KYC</th>
+              <th>الفحص</th>
+              <th>المستندات</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="merchants-tbody"></tbody>
+        </table>
+        <div id="merchants-empty" class="empty hidden">
+          <div class="icon">🏢</div>
+          <p>لا يوجد تجار حتى الآن</p>
+          <button class="btn btn-primary" onclick="openNewMerchantModal()">أضف تاجرك الأول</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">التنبيهات المفتوحة</div>
+      </div>
+      <div id="alerts-list"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Merchants -->
+  <div id="tab-merchants" class="hidden">
+    <div class="section-head">
+      <div class="section-title">إدارة التجار</div>
+      <button class="btn btn-primary" onclick="openNewMerchantModal()">+ تاجر جديد</button>
+    </div>
+    <div id="merchant-detail-area"></div>
+  </div>
+
+  <!-- Tab: Documents -->
+  <div id="tab-documents" class="hidden">
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">المستندات</div>
+      </div>
+      <div class="form-group" style="max-width:400px;margin-bottom:1rem">
+        <label>اختر التاجر</label>
+        <select id="doc-merchant-select" onchange="loadMerchantDocs()">
+          <option value="">— اختر —</option>
+        </select>
+      </div>
+      <div id="doc-upload-area" class="hidden">
+        <div class="panel" style="margin-bottom:1rem">
+          <div class="panel-header"><h3>رفع مستندات جديدة</h3></div>
+          <div class="panel-body">
+            <div class="doc-grid" id="doc-upload-grid"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><h3>المستندات المرفوعة</h3></div>
+          <div class="panel-body">
+            <table>
+              <thead><tr><th>النوع</th><th>الوجه</th><th>OCR</th><th>التحقق</th><th>التاريخ</th></tr></thead>
+              <tbody id="docs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Activity -->
+  <div id="tab-activity" class="hidden">
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">سجل النشاط</div>
+        <button class="btn btn-outline btn-sm" onclick="loadActivity()">⟳ تحديث</button>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>الإجراء</th><th>التاجر</th><th>التفاصيل</th><th>IP</th><th>التاريخ</th></tr></thead>
+          <tbody id="activity-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- New Merchant Modal -->
+<div class="modal-backdrop" id="modal-new-merchant">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>تسجيل تاجر جديد</h2>
+      <button class="modal-close" onclick="closeModal('modal-new-merchant')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <h3 style="font-size:13px;color:var(--text-2);margin-bottom:.75rem">بيانات المنشأة</h3>
+      <div class="form-grid" style="margin-bottom:1.5rem">
+        <div class="form-group"><label><span class="req">*</span>الاسم القانوني (عربي)</label><input id="nm-legalAr" placeholder="شركة ..."></div>
+        <div class="form-group"><label>الاسم القانوني (إنجليزي)</label><input id="nm-legalEn" dir="ltr" placeholder="Company LLC"></div>
+        <div class="form-group"><label>الاسم التجاري</label><input id="nm-trade" placeholder="الاسم التجاري"></div>
+        <div class="form-group"><label>رقم التسجيل</label><input id="nm-regNo" dir="ltr"></div>
+        <div class="form-group"><label>الرقم الضريبي</label><input id="nm-taxId" dir="ltr"></div>
+        <div class="form-group"><label>نوع النشاط</label><input id="nm-bizType" placeholder="تجارة عامة"></div>
+        <div class="form-group"><label>المحافظة</label><input id="nm-gov" placeholder="بغداد"></div>
+        <div class="form-group"><label>المدينة</label><input id="nm-city" placeholder="الكرادة"></div>
+        <div class="form-group full"><label>العنوان</label><input id="nm-address" placeholder="العنوان الكامل"></div>
+        <div class="form-group"><label>الهاتف</label><input id="nm-phone" dir="ltr" placeholder="+964..."></div>
+        <div class="form-group"><label>البريد الإلكتروني</label><input id="nm-email" dir="ltr" type="email"></div>
+      </div>
+      <h3 style="font-size:13px;color:var(--text-2);margin-bottom:.75rem">بيانات المالك الرئيسي</h3>
+      <div class="form-grid">
+        <div class="form-group"><label><span class="req">*</span>الاسم الكامل (عربي)</label><input id="nm-ownerAr" placeholder="الاسم الرباعي بالعربي"></div>
+        <div class="form-group"><label>الاسم الكامل (إنجليزي)</label><input id="nm-ownerEn" dir="ltr"></div>
+        <div class="form-group"><label>اسم الأب</label><input id="nm-father"></div>
+        <div class="form-group"><label>اسم الجد</label><input id="nm-grandfather"></div>
+        <div class="form-group"><label>رقم الهوية الوطنية</label><input id="nm-nid" dir="ltr"></div>
+        <div class="form-group"><label>رقم الجواز</label><input id="nm-passport" dir="ltr"></div>
+        <div class="form-group"><label>تاريخ الميلاد</label><input id="nm-dob" type="date"></div>
+        <div class="form-group"><label>الجنس</label><select id="nm-gender"><option value="">—</option><option value="male">ذكر</option><option value="female">أنثى</option></select></div>
+        <div class="form-group"><label>الجنسية</label><input id="nm-nationality" value="عراقي"></div>
+        <div class="form-group"><label>الهاتف</label><input id="nm-ownerPhone" dir="ltr"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary btn-lg" onclick="submitNewMerchant()">تسجيل التاجر</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-new-merchant')">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- KYC Status Modal -->
+<div class="modal-backdrop" id="modal-kyc-status">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="kyc-modal-title">حالة KYC</h2>
+      <button class="modal-close" onclick="closeModal('modal-kyc-status')">&times;</button>
+    </div>
+    <div class="modal-body" id="kyc-modal-body"></div>
+    <div class="modal-foot" id="kyc-modal-foot"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.arch-hayder.workers.dev';
+let dashboardData = null;
+
+function getKey() { return document.getElementById('apiKey').value.trim(); }
+
+function headers() { return { 'x-api-key': getKey(), 'Content-Type': 'application/json' }; }
+
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function badgeFor(status) {
+  const map = { pending: 'قيد الانتظار', under_review: 'تحت المراجعة', approved: 'مقبول', rejected: 'مرفوض', clear: 'نظيف', hit: 'تطابق' };
+  return `<span class="badge badge-${status}">${map[status] || status || '—'}</span>`;
+}
+
+// ── Tab Navigation ──
+document.querySelectorAll('.nav-item[data-tab]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item[data-tab]').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    const tab = el.dataset.tab;
+    ['dashboard', 'merchants', 'documents', 'activity'].forEach(t => {
+      document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+    });
+    if (tab === 'activity') loadActivity();
+    if (tab === 'documents') populateDocMerchantSelect();
+  });
+});
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ── Load Dashboard ──
+async function loadDashboard() {
+  if (!getKey()) { toast('أدخل مفتاح API', 'error'); return; }
+  try {
+    const res = await fetch(API + '/v1/wayl/dashboard', { headers: headers() });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); toast(e.error || 'فشل التحميل', 'error'); return; }
+    dashboardData = await res.json();
+    renderDashboard();
+    toast('تم تحميل البيانات', 'success');
+  } catch (err) {
+    toast('خطأ في الاتصال: ' + err.message, 'error');
+  }
+}
+
+function renderDashboard() {
+  const d = dashboardData;
+  if (!d) return;
+  const k = d.kycStats;
+  const dc = d.docStats;
+  const ow = d.ownerStats;
+
+  document.getElementById('kpi-grid').innerHTML = `
+    <div class="kpi blue"><div class="kpi-label">إجمالي التجار</div><div class="kpi-value">${k.total}</div><div class="kpi-sub">مسجل في النظام</div></div>
+    <div class="kpi warn"><div class="kpi-label">قيد الانتظار</div><div class="kpi-value">${k.pending}</div><div class="kpi-sub">بحاجة إلى إجراء</div></div>
+    <div class="kpi green"><div class="kpi-label">مقبول</div><div class="kpi-value">${k.approved}</div><div class="kpi-sub">KYC مكتمل</div></div>
+    <div class="kpi orange"><div class="kpi-label">تحت المراجعة</div><div class="kpi-value">${k.underReview}</div><div class="kpi-sub">ينتظر التقييم</div></div>
+    <div class="kpi blue"><div class="kpi-label">المستندات</div><div class="kpi-value">${dc.total}</div><div class="kpi-sub">${dc.verified} محقق — ${dc.pending} معلق</div></div>
+    <div class="kpi red"><div class="kpi-label">تنبيهات مفتوحة</div><div class="kpi-value">${d.openAlerts}</div><div class="kpi-sub">تحتاج معالجة</div></div>
+  `;
+
+  const tbody = document.getElementById('merchants-tbody');
+  const empty = document.getElementById('merchants-empty');
+  if (d.merchants.length === 0) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  tbody.innerHTML = d.merchants.map(m => `
+    <tr>
+      <td><strong>${m.legal_name_ar || ''}</strong><br><small style="color:var(--muted)">${m.legal_name_en || ''}</small></td>
+      <td>${m.trade_name || '—'}</td>
+      <td>${badgeFor(m.kyc_status)}</td>
+      <td>${badgeFor(m.screening_status)}</td>
+      <td>${m.docCount} مستند</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="viewKycStatus('${m.id}')">حالة KYC</button>
+        <button class="btn btn-primary btn-sm" onclick="openKycPage('${m.id}')">استمارة</button>
+      </td>
+    </tr>
+  `).join('');
+
+  // Alerts
+  const aList = document.getElementById('alerts-list');
+  if (d.recentAlerts.length === 0) {
+    aList.innerHTML = '<div class="empty"><p>لا توجد تنبيهات مفتوحة ✓</p></div>';
+  } else {
+    aList.innerHTML = d.recentAlerts.map(a => `
+      <div class="alert alert-${a.severity === 'critical' ? 'danger' : a.severity === 'high' ? 'warn' : 'warn'}">
+        <strong>${a.alert_type}</strong> — ${typeof a.details === 'object' ? JSON.stringify(a.details) : (a.details || '')} 
+        <small style="margin-right:auto">${fmtDate(a.created_at)}</small>
+      </div>
+    `).join('');
+  }
+
+  // Populate doc select
+  populateDocMerchantSelect();
+}
+
+// ── New Merchant ──
+function openNewMerchantModal() {
+  document.getElementById('modal-new-merchant').classList.add('show');
+}
+
+async function submitNewMerchant() {
+  const val = id => document.getElementById(id).value.trim();
+  const legalAr = val('nm-legalAr');
+  const ownerAr = val('nm-ownerAr');
+  if (!legalAr) { toast('الاسم القانوني بالعربي مطلوب', 'error'); return; }
+  if (!ownerAr) { toast('اسم المالك بالعربي مطلوب', 'error'); return; }
+
+  const payload = {
+    legalNameAr: legalAr,
+    legalNameEn: val('nm-legalEn'),
+    tradeName: val('nm-trade'),
+    registrationNumber: val('nm-regNo'),
+    taxId: val('nm-taxId'),
+    businessType: val('nm-bizType'),
+    governorate: val('nm-gov'),
+    city: val('nm-city'),
+    address: val('nm-address'),
+    phone: val('nm-phone'),
+    email: val('nm-email'),
+    owner: {
+      fullNameAr: ownerAr,
+      fullNameEn: val('nm-ownerEn'),
+      fatherNameAr: val('nm-father'),
+      grandfatherNameAr: val('nm-grandfather'),
+      nationalId: val('nm-nid'),
+      passportNumber: val('nm-passport'),
+      dateOfBirth: val('nm-dob') || null,
+      gender: val('nm-gender') || null,
+      nationality: val('nm-nationality'),
+      phone: val('nm-ownerPhone'),
+    }
+  };
+
+  try {
+    const res = await fetch(API + '/v1/wayl/merchants', {
+      method: 'POST', headers: headers(), body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'فشل التسجيل', 'error'); return; }
+    toast('تم تسجيل التاجر بنجاح', 'success');
+    closeModal('modal-new-merchant');
+    loadDashboard();
+  } catch (err) {
+    toast('خطأ: ' + err.message, 'error');
+  }
+}
+
+// ── KYC Status ──
+async function viewKycStatus(merchantId) {
+  try {
+    const res = await fetch(API + '/v1/wayl/merchants/' + merchantId + '/kyc-status', { headers: headers() });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); toast(e.error || 'فشل', 'error'); return; }
+    const d = await res.json();
+    renderKycStatus(d);
+    document.getElementById('modal-kyc-status').classList.add('show');
+  } catch (err) {
+    toast('خطأ: ' + err.message, 'error');
+  }
+}
+
+function renderKycStatus(d) {
+  document.getElementById('kyc-modal-title').textContent = d.legalNameAr + ' — حالة KYC';
+  const body = document.getElementById('kyc-modal-body');
+  const foot = document.getElementById('kyc-modal-foot');
+
+  const docHtml = d.documents.missing.length > 0
+    ? `<div class="alert alert-warn">مستندات ناقصة: <strong>${d.documents.missing.join('، ')}</strong></div>`
+    : `<div class="alert alert-success">جميع المستندات المطلوبة مرفوعة ✓</div>`;
+
+  const ownerRows = d.owners.map(o => `
+    <tr>
+      <td>${o.name}</td>
+      <td>${badgeFor(o.screeningStatus)}</td>
+      <td>
+        <div class="progress-bar" style="width:120px;display:inline-block">
+          <div class="progress-fill" style="width:${o.profileCompleteness}%"></div>
+        </div>
+        <small style="margin-right:.3rem">${o.profileCompleteness}%</small>
+      </td>
+      <td>${o.kycCompleted ? '✅ مكتمل' : '⏳ غير مكتمل'}</td>
+    </tr>
+  `).join('');
+
+  body.innerHTML = `
+    <div class="detail-grid" style="margin-bottom:1.5rem">
+      <div class="detail-row"><div class="detail-label">حالة KYC</div><div class="detail-value">${badgeFor(d.kycStatus)}</div></div>
+      <div class="detail-row"><div class="detail-label">حالة الفحص</div><div class="detail-value">${badgeFor(d.screeningStatus)}</div></div>
+      <div class="detail-row"><div class="detail-label">تصنيف المخاطر</div><div class="detail-value">${d.riskRating || 'غير محدد'}</div></div>
+      <div class="detail-row"><div class="detail-label">تنبيهات مفتوحة</div><div class="detail-value">${d.openAlerts}</div></div>
+      <div class="detail-row"><div class="detail-label">المستندات</div><div class="detail-value">${d.documents.total} مرفوعة — ${d.documents.allVerified ? '✅ كلها محققة' : '⏳ بحاجة تحقق'}</div></div>
+      <div class="detail-row"><div class="detail-label">جاهزية KYC</div><div class="detail-value">${d.overallReady ? '<strong style="color:var(--ok)">جاهز للتقديم ✓</strong>' : '<span style="color:var(--warn)">غير جاهز</span>'}</div></div>
+    </div>
+    ${docHtml}
+    <h3 style="font-size:13px;font-weight:700;margin:1rem 0 .5rem">المالكون</h3>
+    <table><thead><tr><th>الاسم</th><th>الفحص</th><th>اكتمال الملف</th><th>KYC</th></tr></thead><tbody>${ownerRows}</tbody></table>
+  `;
+
+  if (d.kycStatus === 'pending' && d.overallReady) {
+    foot.innerHTML = `<button class="btn btn-success btn-lg" onclick="submitKyc('${d.merchantId}')">تقديم KYC للمراجعة</button>`;
+  } else if (d.kycStatus === 'pending') {
+    foot.innerHTML = `<p style="font-size:12px;color:var(--muted)">أكمل المتطلبات أعلاه قبل التقديم</p>
+      <button class="btn btn-primary btn-sm" onclick="openKycPage('${d.merchantId}')">فتح استمارة KYC</button>`;
+  } else {
+    foot.innerHTML = `<p style="font-size:12px;color:var(--muted)">حالة KYC: ${d.kycStatus}</p>`;
+  }
+}
+
+async function submitKyc(merchantId) {
+  try {
+    const res = await fetch(API + '/v1/wayl/merchants/' + merchantId + '/submit-kyc', {
+      method: 'POST', headers: headers()
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'فشل التقديم', 'error'); return; }
+    toast('تم تقديم KYC للمراجعة بنجاح', 'success');
+    closeModal('modal-kyc-status');
+    loadDashboard();
+  } catch (err) {
+    toast('خطأ: ' + err.message, 'error');
+  }
+}
+
+function openKycPage(merchantId) {
+  window.open('kyc.html?merchant=' + merchantId, '_blank');
+}
+
+// ── Documents Tab ──
+function populateDocMerchantSelect() {
+  if (!dashboardData) return;
+  const sel = document.getElementById('doc-merchant-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— اختر التاجر —</option>' +
+    dashboardData.merchants.map(m => `<option value="${m.id}">${m.legal_name_ar} (${m.trade_name || m.id.slice(0,8)})</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+const docTypes = [
+  { type: 'national_id', side: 'front', label: 'الهوية الوطنية — أمام', icon: '🪪' },
+  { type: 'national_id', side: 'back', label: 'الهوية الوطنية — خلف', icon: '🪪' },
+  { type: 'passport', side: null, label: 'جواز السفر', icon: '📘' },
+  { type: 'resident_id', side: 'front', label: 'بطاقة السكن — أمام', icon: '🏠' },
+  { type: 'resident_id', side: 'back', label: 'بطاقة السكن — خلف', icon: '🏠' },
+  { type: 'business_license', side: null, label: 'إجازة العمل', icon: '📜' },
+];
+
+async function loadMerchantDocs() {
+  const merchantId = document.getElementById('doc-merchant-select').value;
+  const area = document.getElementById('doc-upload-area');
+  if (!merchantId) { area.classList.add('hidden'); return; }
+  area.classList.remove('hidden');
+
+  // Render upload grid
+  document.getElementById('doc-upload-grid').innerHTML = docTypes.map(d => `
+    <div class="doc-card" id="dc-${d.type}-${d.side || 'main'}">
+      <div class="doc-icon">${d.icon}</div>
+      <div class="doc-label">${d.label}</div>
+      <div class="doc-sub">اضغط أو اسحب الملف</div>
+      <div class="doc-status" id="ds-${d.type}-${d.side || 'main'}"></div>
+      <input type="file" accept="image/*" onchange="uploadDoc('${merchantId}','${d.type}','${d.side}',this)">
+    </div>
+  `).join('');
+
+  // Load existing docs
+  try {
+    const res = await fetch(API + '/v1/merchants/' + merchantId, { headers: headers() });
+    if (res.ok) {
+      const data = await res.json();
+      const docs = data.merchant?.documents || [];
+      const tbody = document.getElementById('docs-tbody');
+      tbody.innerHTML = docs.map(d => `
+        <tr>
+          <td>${d.doc_type}</td>
+          <td>${d.doc_side || '—'}</td>
+          <td>${badgeFor(d.ocr_status === 'completed' ? 'approved' : 'pending')}</td>
+          <td>${badgeFor(d.verification_status)}</td>
+          <td>${fmtDate(d.created_at)}</td>
+        </tr>
+      `).join('');
+
+      // Mark uploaded cards
+      docs.forEach(d => {
+        const card = document.getElementById('dc-' + d.doc_type + '-' + (d.doc_side || 'main'));
+        const status = document.getElementById('ds-' + d.doc_type + '-' + (d.doc_side || 'main'));
+        if (card) {
+          card.classList.add('uploaded');
+          if (status) {
+            status.textContent = d.verification_status === 'verified' ? '✅ محقق' : '⏳ مرفوع';
+            status.className = 'doc-status ' + (d.verification_status === 'verified' ? 'ok' : 'pending');
+          }
+        }
+      });
+    }
+  } catch (err) { /* ignore */ }
+}
+
+async function uploadDoc(merchantId, docType, side, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const card = input.parentElement;
+  const statusEl = card.querySelector('.doc-status');
+  card.classList.add('uploading');
+  statusEl.textContent = 'جاري الرفع...';
+  statusEl.className = 'doc-status pending';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', docType);
+    if (side && side !== 'null') formData.append('doc_side', side);
+
+    const res = await fetch(API + '/v1/merchants/' + merchantId + '/documents', {
+      method: 'POST',
+      headers: { 'x-api-key': getKey() },
+      body: formData
+    });
+    const data = await res.json();
+    card.classList.remove('uploading');
+    if (!res.ok) {
+      statusEl.textContent = data.error || 'فشل الرفع';
+      statusEl.className = 'doc-status error';
+      toast('فشل رفع المستند', 'error');
+      return;
+    }
+    card.classList.add('uploaded');
+    statusEl.textContent = '✅ تم الرفع + OCR';
+    statusEl.className = 'doc-status ok';
+    toast('تم رفع المستند بنجاح', 'success');
+    loadMerchantDocs();
+  } catch (err) {
+    card.classList.remove('uploading');
+    statusEl.textContent = 'خطأ';
+    statusEl.className = 'doc-status error';
+    toast('خطأ: ' + err.message, 'error');
+  }
+}
+
+// ── Activity Tab ──
+async function loadActivity() {
+  try {
+    const res = await fetch(API + '/v1/wayl/activity', { headers: headers() });
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('activity-tbody').innerHTML = data.activity.map(a => {
+      let details = '';
+      if (typeof a.details === 'object' && a.details) {
+        details = Object.entries(a.details).map(([k, v]) => `${k}: ${v}`).join(' | ');
+      } else {
+        details = a.details || '';
+      }
+      return `<tr>
+        <td><strong>${a.action}</strong></td>
+        <td>${a.merchant_name || '—'}</td>
+        <td style="font-size:11px">${details}</td>
+        <td dir="ltr" style="font-family:var(--mono);font-size:11px">${a.ip_address || ''}</td>
+        <td>${fmtDate(a.created_at)}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    toast('فشل تحميل السجل', 'error');
+  }
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+  const key = getKey();
+  if (key && key.startsWith('pk_live_wayl')) {
+    loadDashboard();
+  }
+});
+</script>
+</body>
+</html>

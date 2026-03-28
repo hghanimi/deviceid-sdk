@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Way.io — KYC Onboarding | استمارة اعرف زبونك</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8faf9;--surface:#ffffff;--surface-2:#f0f7f5;--border:#dce9e5;--border-2:#c2d8d1;
+  --text:#1a2e28;--text-2:#5a7a6f;--muted:#8da89e;
+  --brand:#0F6E56;--brand-light:#e6f5f0;--brand-dark:#0a5743;--brand-glow:rgba(15,110,86,.12);
+  --ok:#22c55e;--ok-bg:#f0fdf4;--warn:#f59e0b;--warn-bg:#fffbeb;
+  --danger:#ef4444;--danger-bg:#fef2f2;
+  --radius:10px;--radius-lg:14px;
+  --font:'Inter',-apple-system,system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;direction:rtl}
+a{color:var(--brand);text-decoration:none}
+
+/* ── Header ── */
+.header{background:var(--brand-dark);color:#fff;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.header .logo{display:flex;align-items:center;gap:.6rem}
+.logo-box{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#0F6E56,#34d399);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.header h1{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.header-sub{font-size:11px;opacity:.7}
+.header-actions{display:flex;align-items:center;gap:.75rem}
+.header-actions label{font-size:11px;opacity:.8}
+.header-actions input{font-family:var(--mono);font-size:11px;padding:.3rem .5rem;border:1px solid rgba(255,255,255,.3);border-radius:6px;width:200px;background:rgba(255,255,255,.1);color:#fff}
+.header-actions input::placeholder{color:rgba(255,255,255,.4)}
+
+/* ── Container ── */
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+
+/* ── Steps ── */
+.steps{display:flex;gap:0;margin-bottom:2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.step{flex:1;padding:.75rem 1rem;text-align:center;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-left:1px solid var(--border);transition:all .2s;position:relative}
+.step:first-child{border-left:none}
+.step.active{background:var(--brand-light);color:var(--brand)}
+.step.done{background:var(--ok-bg);color:var(--ok)}
+.step .step-num{display:block;font-size:18px;font-weight:700;line-height:1.2}
+
+/* ── Cards / Sections ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1.25rem;overflow:hidden}
+.card-header{padding:.85rem 1.2rem;border-bottom:1px solid var(--border);background:var(--surface-2);display:flex;align-items:center;justify-content:space-between}
+.card-header h2{font-size:14px;font-weight:700;color:var(--text)}
+.card-header .badge{font-size:10px}
+.card-body{padding:1.2rem}
+
+/* ── Form Grid ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.85rem 1.25rem}
+.form-grid.cols-3{grid-template-columns:1fr 1fr 1fr}
+.form-group{display:flex;flex-direction:column;gap:.25rem}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:11.5px;font-weight:600;color:var(--text-2)}
+.form-group label .req{color:var(--danger);margin-right:2px}
+.form-group input,.form-group select,.form-group textarea{padding:.5rem .7rem;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:var(--font);color:var(--text);background:var(--surface);transition:border .15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-glow)}
+.form-group input[readonly]{background:var(--surface-2);color:var(--text-2)}
+.form-group textarea{resize:vertical;min-height:60px}
+
+/* ── Doc Upload ── */
+.doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.doc-card{border:2px dashed var(--border-2);border-radius:var(--radius);padding:1rem;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.doc-card:hover{border-color:var(--brand);background:var(--brand-light)}
+.doc-card.uploaded{border-color:var(--ok);border-style:solid;background:var(--ok-bg)}
+.doc-card.uploading{border-color:var(--warn);opacity:.7;pointer-events:none}
+.doc-card .doc-icon{font-size:28px;margin-bottom:.4rem}
+.doc-card .doc-label{font-size:12px;font-weight:600;color:var(--text)}
+.doc-card .doc-sub{font-size:10px;color:var(--muted);margin-top:.2rem}
+.doc-card .doc-status{font-size:10px;font-weight:600;margin-top:.4rem}
+.doc-card .doc-status.ok{color:var(--ok)}
+.doc-card .doc-status.pending{color:var(--warn)}
+.doc-card .doc-status.error{color:var(--danger)}
+.doc-card input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.doc-thumb{width:80px;height:55px;object-fit:cover;border-radius:4px;margin:0 auto .4rem}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn:hover{filter:brightness(.92)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-success{background:var(--ok);color:#fff}
+.btn-warn{background:var(--warn);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--brand);color:var(--brand)}
+.btn-lg{padding:.7rem 1.5rem;font-size:15px;border-radius:10px}
+
+/* ── Progress ── */
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:.3rem}
+.progress-fill{height:100%;background:var(--brand);border-radius:4px;transition:width .3s ease}
+
+/* ── Report ── */
+.report-section{break-inside:avoid;margin-bottom:1.5rem}
+.report-header{text-align:center;margin-bottom:2rem;padding:1.5rem;border-bottom:2px solid var(--brand)}
+.report-header h1{font-size:22px;color:var(--brand);margin-bottom:.3rem}
+.report-fieldgroup{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .75rem;font-size:13px}
+.report-field{display:flex;gap:.5rem;padding:.35rem 0;border-bottom:1px solid #eee}
+.report-field .label{font-weight:600;color:var(--text-2);min-width:140px;flex-shrink:0}
+.report-field .value{color:var(--text)}
+.report-field .value.missing{color:var(--danger);font-style:italic}
+
+/* ── Alerts ── */
+.alert{padding:.75rem 1rem;border-radius:8px;font-size:12.5px;margin-bottom:.75rem;display:flex;align-items:flex-start;gap:.5rem}
+.alert-success{background:var(--ok-bg);color:#065f46;border:1px solid #86efac}
+.alert-warn{background:var(--warn-bg);color:#92400e;border:1px solid #fcd34d}
+.alert-danger{background:var(--danger-bg);color:#991b1b;border:1px solid #fca5a5}
+
+/* ── Merchant Select ── */
+.merchant-select{margin-bottom:1.5rem}
+.merchant-select select{width:100%;padding:.6rem .8rem;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.owner-tabs{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.owner-tab{padding:.4rem .85rem;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text-2);transition:all .15s}
+.owner-tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.owner-tab .pct{opacity:.6;margin-right:.3rem}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .form-grid,.form-grid.cols-3{grid-template-columns:1fr}
+  .doc-grid{grid-template-columns:1fr}
+  .steps{flex-wrap:wrap}
+  .step{min-width:50%}
+  .report-fieldgroup{grid-template-columns:1fr}
+}
+
+/* ── Print ── */
+@media print{
+  .header,.steps,.btn,.doc-card input,.no-print{display:none!important}
+  body{background:#fff;font-size:11px}
+  .container{max-width:100%;padding:0}
+  .card{border:1px solid #ddd;break-inside:avoid}
+}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);padding:.6rem 1.2rem;border-radius:8px;font-size:13px;font-weight:600;color:#fff;background:var(--brand);z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.toast.error{background:var(--danger)}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-box">W</div>
+    <div>
+      <div style="font-size:16px;font-weight:700">Way.io</div>
+      <div class="header-sub">CBI KYC — استمارة اعرف زبونك</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <label>API Key</label>
+    <input type="text" id="apiKey" placeholder="pk_live_athar_001" value="pk_live_athar_001">
+  </div>
+</div>
+
+<div class="container">
+
+<!-- Step Indicator -->
+<div class="steps" id="stepBar">
+  <div class="step active" onclick="goStep(1)"><span class="step-num">١</span>اختيار التاجر</div>
+  <div class="step" onclick="goStep(2)"><span class="step-num">٢</span>رفع المستندات</div>
+  <div class="step" onclick="goStep(3)"><span class="step-num">٣</span>البيانات الشخصية</div>
+  <div class="step" onclick="goStep(4)"><span class="step-num">٤</span>العنوان والعمل</div>
+  <div class="step" onclick="goStep(5)"><span class="step-num">٥</span>الامتثال</div>
+  <div class="step" onclick="goStep(6)"><span class="step-num">٦</span>تقرير KYC</div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STEP 1: Merchant & Owner Selection         -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="step1" class="step-content">
+  <div class="card">
+    <div class="card-header"><h2>🏢 اختيار التاجر والمالك</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>التاجر <span class="req">*</span></label>
+          <select id="merchantSelect" onchange="onMerchantChange()">
+            <option value="">— اختر التاجر —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>المالك / المستفيد <span class="req">*</span></label>
+          <select id="ownerSelect" onchange="onOwnerChange()">
+            <option value="">— اختر المالك —</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:1rem">
+        <div id="ownerInfo" class="alert alert-success hidden">
+          <span>✓</span> <span id="ownerInfoText"></span>
+        </div>
+      </div>
+      <div style="margin-top:1.25rem;display:flex;justify-content:flex-start">
+        <button class="btn btn-primary" onclick="goStep(2)" id="btnToStep2" disabled>التالي — رفع المستندات →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STEP 2: Document Upload                    -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="step2" class="step-content hidden">
+  <div class="card">
+    <div class="card-header">
+      <h2>📄 المستندات المطلوبة — قائمة وثائق البنك المركزي العراقي</h2>
+      <button class="btn btn-outline btn-sm" onclick="autoFillFromOcr()" id="btnAutoFill" disabled>🔄 تعبئة تلقائية من OCR</button>
+    </div>
+    <div class="card-body">
+      <div id="docAlerts"></div>
+      <div class="doc-grid">
+        <!-- National ID Front -->
+        <div class="doc-card" id="docCard_national_id_front">
+          <div class="doc-icon">🪪</div>
+          <div class="doc-label">البطاقة الوطنية — الوجه الأمامي</div>
+          <div class="doc-sub">الاسم، الجنس، فصيلة الدم، رقم البطاقة</div>
+          <div class="doc-status" id="docStatus_national_id_front"></div>
+          <input type="file" accept="image/*,.pdf" onchange="uploadDoc(this,'national_id','front')">
+        </div>
+        <!-- National ID Back -->
+        <div class="doc-card" id="docCard_national_id_back">
+          <div class="doc-icon">🪪</div>
+          <div class="doc-label">البطاقة الوطنية — الوجه الخلفي</div>
+          <div class="doc-sub">تاريخ الولادة، الاصدار، النفاذ، MRZ</div>
+          <div class="doc-status" id="docStatus_national_id_back"></div>
+          <input type="file" accept="image/*,.pdf" onchange="uploadDoc(this,'national_id','back')">
+        </div>
+        <!-- Passport -->
+        <div class="doc-card" id="docCard_passport">
+          <div class="doc-icon">🛂</div>
+          <div class="doc-label">جواز السفر</div>
+          <div class="doc-sub">مطلوب للتعاملات بالدولار — الاسم الإنجليزي</div>
+          <div class="doc-status" id="docStatus_passport"></div>
+          <input type="file" accept="image/*,.pdf" onchange="uploadDoc(this,'passport','front')">
+        </div>
+        <!-- Resident ID -->
+        <div class="doc-card" id="docCard_resident_id">
+          <div class="doc-icon">🏠</div>
+          <div class="doc-label">بطاقة السكن</div>
+          <div class="doc-sub">إثبات محل الإقامة — مطلوب من البنك المركزي</div>
+          <div class="doc-status" id="docStatus_resident_id"></div>
+          <input type="file" accept="image/*,.pdf" onchange="uploadDoc(this,'resident_id','front')">
+        </div>
+        <!-- Business License (optional) -->
+        <div class="doc-card" id="docCard_business_license">
+          <div class="doc-icon">📋</div>
+          <div class="doc-label">إجازة العمل / السجل التجاري</div>
+          <div class="doc-sub">اختياري — لأصحاب الأعمال</div>
+          <div class="doc-status" id="docStatus_business_license"></div>
+          <input type="file" accept="image/*,.pdf" onchange="uploadDoc(this,'business_license','front')">
+        </div>
+        <!-- Employment proof (other) -->
+        <div class="doc-card" id="docCard_other">
+          <div class="doc-icon">📎</div>
+          <div class="doc-label">إثبات الدخل / كتاب تأييد الوظيفة</div>
+          <div class="doc-sub">اختياري — للمبالغ فوق 13,200,000 د.ع</div>
+          <div class="doc-status" id="docStatus_other"></div>
+          <input type="file" accept="image/*,.pdf" onchange="uploadDoc(this,'other','front')">
+        </div>
+      </div>
+      <div style="margin-top:1.25rem;display:flex;gap:.75rem;justify-content:space-between">
+        <button class="btn btn-outline" onclick="goStep(1)">← السابق</button>
+        <button class="btn btn-primary" onclick="goStep(3)">التالي — البيانات الشخصية →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STEP 3: Personal Data                      -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="step3" class="step-content hidden">
+  <div class="card">
+    <div class="card-header"><h2>👤 البيانات الشخصية الأساسية — CBI Section 1 & 2</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group"><label><span class="req">*</span> الاسم الأول</label><input id="f_first_name" placeholder="حيدر"></div>
+        <div class="form-group"><label><span class="req">*</span> اسم الأب</label><input id="f_father" placeholder="عزيز"></div>
+        <div class="form-group"><label><span class="req">*</span> اسم الجد</label><input id="f_grandfather" placeholder="كاظم"></div>
+        <div class="form-group"><label><span class="req">*</span> اللقب / العائلة</label><input id="f_family" placeholder="غانمي"></div>
+        <div class="form-group"><label><span class="req">*</span> الاسم الكامل (بالعربي)</label><input id="f_full_ar" placeholder="حيدر عزيز كاظم غانمي" readonly style="background:var(--surface-2)"></div>
+        <div class="form-group"><label>الاسم الكامل (بالإنجليزي) — من الجواز</label><input id="f_full_en" placeholder="HAYDER AZEEZ KADHIM GHANIMI"></div>
+        <div class="form-group"><label><span class="req">*</span> اسم الأم</label><input id="f_mother" placeholder="ابتسام حمزه"></div>
+        <div class="form-group"><label><span class="req">*</span> تاريخ الميلاد</label><input type="date" id="f_dob"></div>
+        <div class="form-group"><label><span class="req">*</span> محل الولادة</label><input id="f_pob" placeholder="كربلاء"></div>
+        <div class="form-group"><label><span class="req">*</span> الجنس</label>
+          <select id="f_gender"><option value="">—</option><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select>
+        </div>
+        <div class="form-group"><label><span class="req">*</span> الجنسية</label><input id="f_nationality" placeholder="عراقي"></div>
+        <div class="form-group"><label>جنسية ثانوية</label><input id="f_nationality2" placeholder=""></div>
+        <div class="form-group"><label>الحالة الاجتماعية</label>
+          <select id="f_marital"><option value="">—</option><option value="أعزب">أعزب</option><option value="متزوج">متزوج</option><option value="مطلق">مطلق</option><option value="أرمل">أرمل</option></select>
+        </div>
+        <div class="form-group"><label>المستوى التعليمي</label>
+          <select id="f_education"><option value="">—</option><option value="ابتدائي">ابتدائي</option><option value="متوسط">متوسط</option><option value="إعدادي">إعدادي</option><option value="دبلوم">دبلوم</option><option value="بكالوريوس">بكالوريوس</option><option value="ماجستير">ماجستير</option><option value="دكتوراه">دكتوراه</option></select>
+        </div>
+        <div class="form-group"><label>فصيلة الدم</label><input id="f_blood" placeholder="AB+"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>🪪 تفاصيل الهوية — البطاقة الوطنية</h2></div>
+    <div class="card-body">
+      <div class="form-grid cols-3">
+        <div class="form-group"><label><span class="req">*</span> رقم البطاقة الوطنية</label><input id="f_nid" placeholder="199040310180"></div>
+        <div class="form-group"><label>رقم السجل المدني</label><input id="f_civil" placeholder="AM5002278"></div>
+        <div class="form-group"><label>الرقم العائلي</label><input id="f_family_num" placeholder="10110054320019001"></div>
+        <div class="form-group"><label><span class="req">*</span> تاريخ الاصدار</label><input type="date" id="f_nid_issue"></div>
+        <div class="form-group"><label><span class="req">*</span> تاريخ النفاذ</label><input type="date" id="f_nid_expiry"></div>
+        <div class="form-group"><label>جهة الاصدار</label><input id="f_nid_office" placeholder="مديرية الجنسية والمعلومات المدنية"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>🛂 تفاصيل جواز السفر</h2></div>
+    <div class="card-body">
+      <div class="form-grid cols-3">
+        <div class="form-group"><label>رقم الجواز</label><input id="f_passport" placeholder="A12148345"></div>
+        <div class="form-group"><label>تاريخ الاصدار</label><input type="date" id="f_pp_issue"></div>
+        <div class="form-group"><label>تاريخ النفاذ</label><input type="date" id="f_pp_expiry"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:.75rem;justify-content:space-between">
+    <button class="btn btn-outline" onclick="goStep(2)">← السابق</button>
+    <button class="btn btn-primary" onclick="goStep(4)">التالي — العنوان والعمل →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STEP 4: Address & Employment               -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="step4" class="step-content hidden">
+  <div class="card">
+    <div class="card-header"><h2>📍 العنوان والإقامة — CBI Section 3</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group"><label><span class="req">*</span> المحافظة</label>
+          <select id="f_gov">
+            <option value="">—</option>
+            <option value="بغداد">بغداد</option><option value="البصرة">البصرة</option><option value="نينوى">نينوى</option>
+            <option value="أربيل">أربيل</option><option value="النجف">النجف</option><option value="كربلاء">كربلاء</option>
+            <option value="كركوك">كركوك</option><option value="السليمانية">السليمانية</option><option value="ذي قار">ذي قار</option>
+            <option value="بابل">بابل</option><option value="ديالى">ديالى</option><option value="الأنبار">الأنبار</option>
+            <option value="واسط">واسط</option><option value="صلاح الدين">صلاح الدين</option><option value="ميسان">ميسان</option>
+            <option value="المثنى">المثنى</option><option value="القادسية">القادسية</option><option value="دهوك">دهوك</option>
+          </select>
+        </div>
+        <div class="form-group"><label><span class="req">*</span> القضاء / المنطقة</label><input id="f_district" placeholder="الكرادة"></div>
+        <div class="form-group"><label>المحلة</label><input id="f_neighborhood" placeholder="محلة 309"></div>
+        <div class="form-group"><label>الزقاق / رقم الدار</label><input id="f_street" placeholder="زقاق 12، دار 5"></div>
+        <div class="form-group"><label>رقم بطاقة السكن</label><input id="f_rescard" placeholder=""></div>
+        <div class="form-group"><label><span class="req">*</span> رقم الهاتف (عراقي)</label><input id="f_phone" placeholder="07XX XXX XXXX" dir="ltr"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>💼 المعلومات الوظيفية والمالية — CBI Section 4</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group"><label><span class="req">*</span> المهنة / الوظيفة</label><input id="f_occupation" placeholder="موظف حكومي / قطاع خاص / تاجر"></div>
+        <div class="form-group"><label>اسم جهة العمل</label><input id="f_employer" placeholder="وزارة المالية / شركة ..."></div>
+        <div class="form-group"><label>الدخل الشهري</label>
+          <div style="display:flex;gap:.5rem">
+            <input id="f_income" placeholder="1,500,000" style="flex:1" dir="ltr">
+            <select id="f_income_cur" style="width:80px"><option value="IQD">د.ع</option><option value="USD">$</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label>حجم التعاملات الشهرية المتوقعة</label><input id="f_volume" placeholder="5,000,000 د.ع"></div>
+        <div class="form-group"><label><span class="req">*</span> مصدر الأموال</label>
+          <select id="f_source">
+            <option value="">—</option>
+            <option value="راتب">راتب</option><option value="أرباح تجارية">أرباح تجارية</option>
+            <option value="إرث">إرث</option><option value="مدخرات">مدخرات</option>
+            <option value="استثمارات">استثمارات</option><option value="أخرى">أخرى</option>
+          </select>
+        </div>
+        <div class="form-group"><label>الغرض من الحساب / العلاقة</label>
+          <select id="f_purpose">
+            <option value="">—</option>
+            <option value="توطين راتب">توطين راتب</option><option value="ادخار">ادخار</option>
+            <option value="تجارة">تجارة</option><option value="تحويلات">تحويلات</option>
+            <option value="أخرى">أخرى</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:.75rem;justify-content:space-between">
+    <button class="btn btn-outline" onclick="goStep(3)">← السابق</button>
+    <button class="btn btn-primary" onclick="goStep(5)">التالي — الامتثال →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STEP 5: Compliance / PEP / UBO             -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="step5" class="step-content hidden">
+  <div class="card">
+    <div class="card-header"><h2>⚖️ الامتثال والفحص — CBI Section 5</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label style="font-size:13px;margin-bottom:.5rem">هل أنت شخص مكشوف سياسياً (PEP)؟</label>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:.3rem;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="f_pep_self"> أنا شخص مكشوف سياسياً (عضو برلمان، مسؤول حكومي كبير، ضابط عسكري رفيع)
+            </label>
+          </div>
+        </div>
+        <div class="form-group full">
+          <div style="display:flex;gap:1rem;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:.3rem;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="f_pep_family"> أحد أفراد عائلتي المقربين شخص مكشوف سياسياً
+            </label>
+          </div>
+        </div>
+        <div class="form-group full" id="pepDetailsGroup" style="display:none">
+          <label>تفاصيل PEP (المنصب، الجهة، صلة القرابة)</label>
+          <textarea id="f_pep_details" placeholder="اذكر المنصب والجهة التي يعمل بها..."></textarea>
+        </div>
+      </div>
+      <hr style="margin:1rem 0;border:none;border-top:1px solid var(--border)">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label style="font-size:13px;margin-bottom:.5rem">إقرار المستفيد الحقيقي (UBO)</label>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:.3rem;font-size:13px;cursor:pointer">
+              <input type="radio" name="ubo" value="yes" checked id="f_ubo_yes"> أفتح الحساب لمصلحتي الشخصية
+            </label>
+            <label style="display:flex;align-items:center;gap:.3rem;font-size:13px;cursor:pointer">
+              <input type="radio" name="ubo" value="no" id="f_ubo_no"> أفتح الحساب لمصلحة شخص آخر
+            </label>
+          </div>
+        </div>
+        <div class="form-group full" id="uboDetailsGroup" style="display:none">
+          <label>بيانات المستفيد الحقيقي</label>
+          <textarea id="f_ubo_details" placeholder="الاسم الكامل، رقم الهوية، صلة القرابة..."></textarea>
+        </div>
+      </div>
+      <hr style="margin:1rem 0;border:none;border-top:1px solid var(--border)">
+      <div class="form-grid">
+        <div class="form-group"><label>نسبة الملكية %</label><input type="number" id="f_ownership" placeholder="100" min="0" max="100" dir="ltr"></div>
+        <div class="form-group"><label>الدور / المنصب</label><input id="f_role" placeholder="المالك، المدير العام"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:.75rem;justify-content:space-between">
+    <button class="btn btn-outline" onclick="goStep(4)">← السابق</button>
+    <button class="btn btn-success btn-lg" onclick="saveAndGenerateKyc()" id="btnSaveKyc">💾 حفظ وإنشاء تقرير KYC</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- STEP 6: KYC Report                         -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="step6" class="step-content hidden">
+  <div id="reportContent"></div>
+  <div style="margin-top:1.5rem;display:flex;gap:.75rem;justify-content:center" class="no-print">
+    <button class="btn btn-outline" onclick="goStep(1)">← بدء KYC جديد</button>
+    <button class="btn btn-primary" onclick="window.print()">🖨️ طباعة التقرير</button>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.arch-hayder.workers.dev';
+let currentMerchant = null;
+let currentOwner = null;
+let currentStep = 1;
+let uploadedDocs = {};
+
+function getKey() { return document.getElementById('apiKey').value.trim(); }
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+function toast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ── Step Navigation ──
+function goStep(n) {
+  currentStep = n;
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById('step' + i).classList.toggle('hidden', i !== n);
+  }
+  document.querySelectorAll('.step').forEach((el, idx) => {
+    el.classList.remove('active', 'done');
+    if (idx + 1 === n) el.classList.add('active');
+    else if (idx + 1 < n) el.classList.add('done');
+  });
+  if (n === 3) populateFormFromOwner();
+  if (n === 6) loadKycReport();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Load Merchants ──
+async function loadMerchants() {
+  try {
+    const r = await fetch(API + '/v1/merchants', { headers: { 'x-api-key': getKey() } });
+    const d = await r.json();
+    const sel = document.getElementById('merchantSelect');
+    sel.innerHTML = '<option value="">— اختر التاجر —</option>';
+    (d.merchants || []).forEach(m => {
+      sel.innerHTML += `<option value="${m.id}">${escHtml(m.legal_name_ar)} ${m.legal_name_en ? '(' + escHtml(m.legal_name_en) + ')' : ''}</option>`;
+    });
+  } catch (e) { toast('فشل تحميل التجار', true); }
+}
+
+async function onMerchantChange() {
+  const mid = document.getElementById('merchantSelect').value;
+  const ownerSel = document.getElementById('ownerSelect');
+  ownerSel.innerHTML = '<option value="">— اختر المالك —</option>';
+  document.getElementById('btnToStep2').disabled = true;
+  currentMerchant = null;
+  currentOwner = null;
+  if (!mid) return;
+  try {
+    const r = await fetch(API + '/v1/merchants/' + mid, { headers: { 'x-api-key': getKey() } });
+    const d = await r.json();
+    currentMerchant = d.merchant || d;
+    const owners = d.owners || currentMerchant.owners || [];
+    owners.forEach(o => {
+      ownerSel.innerHTML += `<option value="${o.id}">${escHtml(o.full_name_ar)} ${o.ownership_pct ? '(' + o.ownership_pct + '%)' : ''}</option>`;
+    });
+    if (owners.length === 1) {
+      ownerSel.value = owners[0].id;
+      onOwnerChange();
+    }
+  } catch (e) { toast('فشل تحميل بيانات التاجر', true); }
+}
+
+async function onOwnerChange() {
+  const oid = document.getElementById('ownerSelect').value;
+  document.getElementById('btnToStep2').disabled = !oid;
+  if (!oid) { currentOwner = null; document.getElementById('ownerInfo').classList.add('hidden'); return; }
+
+  // Find owner from current merchant data
+  const owners = currentMerchant?.owners || [];
+  currentOwner = owners.find(o => o.id === oid);
+
+  // If we don't have full owner data, fetch the merchant details again
+  if (!currentOwner) {
+    try {
+      const mid = document.getElementById('merchantSelect').value;
+      const r = await fetch(API + '/v1/merchants/' + mid, { headers: { 'x-api-key': getKey() } });
+      const d = await r.json();
+      const allOwners = d.owners || [];
+      currentOwner = allOwners.find(o => o.id === oid);
+    } catch (e) {}
+  }
+
+  if (currentOwner) {
+    document.getElementById('ownerInfo').classList.remove('hidden');
+    document.getElementById('ownerInfoText').textContent =
+      `${currentOwner.full_name_ar || ''} | ${currentOwner.nationality || '—'} | ${currentOwner.national_id || '—'}`;
+
+    // Load existing docs for this owner
+    await loadOwnerDocs();
+  }
+}
+
+// ── Load Owner Documents ──
+async function loadOwnerDocs() {
+  uploadedDocs = {};
+  const docTypes = ['national_id_front', 'national_id_back', 'passport', 'resident_id', 'business_license', 'other'];
+  docTypes.forEach(dt => {
+    const card = document.getElementById('docCard_' + dt);
+    if (card) { card.classList.remove('uploaded'); }
+    const status = document.getElementById('docStatus_' + dt);
+    if (status) status.textContent = '';
+  });
+
+  if (!currentMerchant) return;
+  try {
+    const r = await fetch(API + '/v1/merchants/' + currentMerchant.id + '/documents', { headers: { 'x-api-key': getKey() } });
+    const d = await r.json();
+    const ownerDocs = (d.documents || []).filter(doc => doc.owner_id === currentOwner?.id);
+    let hasOcr = false;
+    ownerDocs.forEach(doc => {
+      const key = doc.doc_type === 'national_id' ? `${doc.doc_type}_${doc.doc_side || 'front'}` : doc.doc_type;
+      uploadedDocs[key] = doc;
+      const card = document.getElementById('docCard_' + key);
+      const status = document.getElementById('docStatus_' + key);
+      if (card) card.classList.add('uploaded');
+      if (status) {
+        if (doc.ocr_status === 'completed') {
+          status.textContent = '✓ OCR مكتمل';
+          status.className = 'doc-status ok';
+          hasOcr = true;
+        } else if (doc.ocr_status === 'failed') {
+          status.textContent = '✗ OCR فشل';
+          status.className = 'doc-status error';
+        } else {
+          status.textContent = '⏳ بانتظار OCR';
+          status.className = 'doc-status pending';
+        }
+        if (doc.verification_status === 'verified') {
+          status.textContent += ' | ✓ مصدّق';
+        }
+      }
+    });
+    document.getElementById('btnAutoFill').disabled = !hasOcr;
+  } catch (e) {}
+}
+
+// ── Upload Document ──
+async function uploadDoc(input, docType, docSide) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!currentMerchant || !currentOwner) { toast('اختر التاجر والمالك أولاً', true); return; }
+
+  const key = docType === 'national_id' ? `${docType}_${docSide}` : docType;
+  const card = document.getElementById('docCard_' + key);
+  const status = document.getElementById('docStatus_' + key);
+  card.classList.add('uploading');
+  status.textContent = '⏳ جاري الرفع...';
+  status.className = 'doc-status pending';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('docType', docType);
+  fd.append('ownerId', currentOwner.id);
+  fd.append('docSide', docSide);
+
+  try {
+    const r = await fetch(API + '/v1/merchants/' + currentMerchant.id + '/documents', {
+      method: 'POST',
+      headers: { 'x-api-key': getKey() },
+      body: fd,
+    });
+    const d = await r.json();
+    card.classList.remove('uploading');
+    if (r.ok) {
+      card.classList.add('uploaded');
+      status.textContent = '✓ تم الرفع — OCR قيد المعالجة';
+      status.className = 'doc-status ok';
+      uploadedDocs[key] = d.document || d;
+      toast('تم رفع ' + file.name);
+      // Check OCR status after delay
+      setTimeout(() => loadOwnerDocs(), 6000);
+    } else {
+      status.textContent = '✗ ' + (d.error || 'فشل الرفع');
+      status.className = 'doc-status error';
+      toast(d.error || 'فشل الرفع', true);
+    }
+  } catch (e) {
+    card.classList.remove('uploading');
+    status.textContent = '✗ خطأ في الاتصال';
+    status.className = 'doc-status error';
+    toast('خطأ في رفع الملف', true);
+  }
+  input.value = '';
+}
+
+// ── Auto-fill from OCR ──
+async function autoFillFromOcr() {
+  if (!currentOwner) return;
+  try {
+    const r = await fetch(API + '/v1/owners/' + currentOwner.id + '/auto-fill', {
+      method: 'POST',
+      headers: { 'x-api-key': getKey() },
+    });
+    const d = await r.json();
+    if (d.filled > 0) {
+      toast('تم تعبئة ' + d.filled + ' حقل تلقائياً من OCR');
+      // Re-fetch owner data
+      const mid = currentMerchant.id;
+      const mr = await fetch(API + '/v1/merchants/' + mid, { headers: { 'x-api-key': getKey() } });
+      const md = await mr.json();
+      const owners = md.owners || [];
+      currentOwner = owners.find(o => o.id === currentOwner.id) || currentOwner;
+      onOwnerChange();
+    } else {
+      toast('لا توجد بيانات OCR لتعبئتها');
+    }
+  } catch (e) { toast('فشل التعبئة التلقائية', true); }
+}
+
+// ── Populate Form from Owner data ──
+function populateFormFromOwner() {
+  if (!currentOwner) return;
+  const o = currentOwner;
+  const parts = (o.full_name_ar || '').split(' ');
+
+  document.getElementById('f_first_name').value = parts[0] || o.full_name_ar || '';
+  document.getElementById('f_father').value = o.father_name_ar || parts[1] || '';
+  document.getElementById('f_grandfather').value = o.grandfather_name_ar || parts[2] || '';
+  document.getElementById('f_family').value = o.family_name_ar || parts[3] || '';
+  document.getElementById('f_full_ar').value = o.full_name_ar || '';
+  document.getElementById('f_full_en').value = o.full_name_en || '';
+  document.getElementById('f_mother').value = o.mother_name_ar || '';
+  document.getElementById('f_dob').value = (o.date_of_birth || '').substring(0, 10);
+  document.getElementById('f_pob').value = o.place_of_birth || '';
+  document.getElementById('f_gender').value = o.gender || '';
+  document.getElementById('f_nationality').value = o.nationality || '';
+  document.getElementById('f_nationality2').value = o.secondary_nationality || '';
+  document.getElementById('f_marital').value = o.marital_status || '';
+  document.getElementById('f_education').value = o.education_level || '';
+  document.getElementById('f_blood').value = o.blood_type || '';
+
+  document.getElementById('f_nid').value = o.national_id || '';
+  document.getElementById('f_civil').value = o.civil_status_number || '';
+  document.getElementById('f_family_num').value = o.family_number || '';
+  document.getElementById('f_nid_issue').value = (o.national_id_issue_date || '').substring(0, 10);
+  document.getElementById('f_nid_expiry').value = (o.national_id_expiry || '').substring(0, 10);
+  document.getElementById('f_nid_office').value = o.national_id_issuing_office || '';
+
+  document.getElementById('f_passport').value = o.passport_number || '';
+  document.getElementById('f_pp_issue').value = (o.passport_issue_date || '').substring(0, 10);
+  document.getElementById('f_pp_expiry').value = (o.passport_expiry || '').substring(0, 10);
+
+  document.getElementById('f_gov').value = o.governorate || '';
+  document.getElementById('f_district').value = o.district || '';
+  document.getElementById('f_neighborhood').value = o.neighborhood || '';
+  document.getElementById('f_street').value = o.street_address || '';
+  document.getElementById('f_rescard').value = o.residency_card_number || '';
+  document.getElementById('f_phone').value = o.phone || '';
+
+  document.getElementById('f_occupation').value = o.occupation || '';
+  document.getElementById('f_employer').value = o.employer_name || '';
+  document.getElementById('f_income').value = o.monthly_income || '';
+  document.getElementById('f_income_cur').value = o.income_currency || 'IQD';
+  document.getElementById('f_volume').value = o.expected_monthly_volume || '';
+  document.getElementById('f_source').value = o.source_of_funds || '';
+  document.getElementById('f_purpose').value = o.purpose_of_account || '';
+
+  document.getElementById('f_pep_self').checked = !!o.is_pep_self;
+  document.getElementById('f_pep_family').checked = !!o.is_pep_family;
+  document.getElementById('f_pep_details').value = o.pep_details || '';
+  document.getElementById('f_ubo_yes').checked = o.is_beneficial_owner !== false;
+  document.getElementById('f_ubo_no').checked = o.is_beneficial_owner === false;
+  document.getElementById('f_ubo_details').value = o.ubo_details || '';
+  document.getElementById('f_ownership').value = o.ownership_pct || '';
+  document.getElementById('f_role').value = o.role || '';
+
+  // Auto-compute full name
+  updateFullName();
+}
+
+function updateFullName() {
+  const first = document.getElementById('f_first_name').value.trim();
+  const father = document.getElementById('f_father').value.trim();
+  const gf = document.getElementById('f_grandfather').value.trim();
+  const family = document.getElementById('f_family').value.trim();
+  document.getElementById('f_full_ar').value = [first, father, gf, family].filter(Boolean).join(' ');
+}
+['f_first_name', 'f_father', 'f_grandfather', 'f_family'].forEach(id => {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById(id)?.addEventListener('input', updateFullName);
+  });
+});
+
+// PEP / UBO toggle
+document.addEventListener('DOMContentLoaded', () => {
+  ['f_pep_self', 'f_pep_family'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      const show = document.getElementById('f_pep_self').checked || document.getElementById('f_pep_family').checked;
+      document.getElementById('pepDetailsGroup').style.display = show ? '' : 'none';
+    });
+  });
+  document.querySelectorAll('input[name=ubo]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('uboDetailsGroup').style.display =
+        document.getElementById('f_ubo_no').checked ? '' : 'none';
+    });
+  });
+});
+
+// ── Save All & Generate KYC ──
+async function saveAndGenerateKyc() {
+  if (!currentOwner) { toast('اختر المالك أولاً', true); return; }
+
+  const btn = document.getElementById('btnSaveKyc');
+  btn.disabled = true;
+  btn.textContent = '⏳ جاري الحفظ...';
+
+  const body = {
+    fullNameAr: document.getElementById('f_full_ar').value,
+    fullNameEn: document.getElementById('f_full_en').value,
+    fatherNameAr: document.getElementById('f_father').value,
+    grandfatherNameAr: document.getElementById('f_grandfather').value,
+    familyNameAr: document.getElementById('f_family').value,
+    motherNameAr: document.getElementById('f_mother').value,
+    dateOfBirth: document.getElementById('f_dob').value || null,
+    placeOfBirth: document.getElementById('f_pob').value,
+    gender: document.getElementById('f_gender').value,
+    nationality: document.getElementById('f_nationality').value,
+    secondaryNationality: document.getElementById('f_nationality2').value,
+    maritalStatus: document.getElementById('f_marital').value,
+    educationLevel: document.getElementById('f_education').value,
+    bloodType: document.getElementById('f_blood').value,
+
+    nationalId: document.getElementById('f_nid').value,
+    civilStatusNumber: document.getElementById('f_civil').value,
+    familyNumber: document.getElementById('f_family_num').value,
+    nationalIdIssueDate: document.getElementById('f_nid_issue').value || null,
+    nationalIdExpiry: document.getElementById('f_nid_expiry').value || null,
+    nationalIdIssuingOffice: document.getElementById('f_nid_office').value,
+
+    passportNumber: document.getElementById('f_passport').value,
+    passportIssueDate: document.getElementById('f_pp_issue').value || null,
+    passportExpiry: document.getElementById('f_pp_expiry').value || null,
+
+    governorate: document.getElementById('f_gov').value,
+    district: document.getElementById('f_district').value,
+    neighborhood: document.getElementById('f_neighborhood').value,
+    streetAddress: document.getElementById('f_street').value,
+    residencyCardNumber: document.getElementById('f_rescard').value,
+    phone: document.getElementById('f_phone').value,
+
+    occupation: document.getElementById('f_occupation').value,
+    employerName: document.getElementById('f_employer').value,
+    monthlyIncome: document.getElementById('f_income').value,
+    incomeCurrency: document.getElementById('f_income_cur').value,
+    expectedMonthlyVolume: document.getElementById('f_volume').value,
+    sourceOfFunds: document.getElementById('f_source').value,
+    purposeOfAccount: document.getElementById('f_purpose').value,
+
+    isPepSelf: document.getElementById('f_pep_self').checked,
+    isPepFamily: document.getElementById('f_pep_family').checked,
+    pepDetails: document.getElementById('f_pep_details').value,
+    isBeneficialOwner: document.getElementById('f_ubo_yes').checked,
+    uboDetails: document.getElementById('f_ubo_details').value,
+    ownershipPct: document.getElementById('f_ownership').value ? parseFloat(document.getElementById('f_ownership').value) : null,
+    role: document.getElementById('f_role').value,
+  };
+
+  try {
+    const r = await fetch(API + '/v1/owners/' + currentOwner.id, {
+      method: 'PATCH',
+      headers: { 'x-api-key': getKey(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Save failed');
+    currentOwner = d.owner || currentOwner;
+    toast('✓ تم حفظ بيانات KYC');
+    goStep(6);
+  } catch (e) {
+    toast('فشل الحفظ: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 حفظ وإنشاء تقرير KYC';
+  }
+}
+
+// ── Load KYC Report ──
+async function loadKycReport() {
+  if (!currentMerchant) return;
+  const el = document.getElementById('reportContent');
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">⏳ جاري إنشاء التقرير...</div>';
+
+  try {
+    const r = await fetch(API + '/v1/merchants/' + currentMerchant.id + '/kyc-report', {
+      headers: { 'x-api-key': getKey() },
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Report failed');
+    renderReport(d.report);
+  } catch (e) {
+    el.innerHTML = '<div class="alert alert-danger">فشل إنشاء التقرير: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderReport(report) {
+  const el = document.getElementById('reportContent');
+  const owner = report.owners?.find(o => o.id === currentOwner?.id) || report.owners?.[0];
+  if (!owner) { el.innerHTML = '<div class="alert alert-warn">لا يوجد مالك لعرض التقرير</div>'; return; }
+
+  const ov = report.overall;
+  const statusBadge = ov.kycReady
+    ? '<span style="color:var(--ok);font-weight:700;font-size:16px">✓ مكتمل — جاهز للاعتماد</span>'
+    : '<span style="color:var(--warn);font-weight:700;font-size:16px">⚠ غير مكتمل</span>';
+
+  const field = (label, value, required) => {
+    const v = value || '';
+    return `<div class="report-field"><span class="label">${escHtml(label)}</span><span class="value${!v && required ? ' missing' : ''}">${v ? escHtml(String(v)) : (required ? 'مطلوب ❌' : '—')}</span></div>`;
+  };
+
+  const docStatus = (key, label) => {
+    const d = owner.documents?.[key];
+    if (!d) return `<div class="report-field"><span class="label">${escHtml(label)}</span><span class="value missing">غير مرفوع ❌</span></div>`;
+    const st = d.status === 'verified' ? '✓ مصدّق' : d.status === 'rejected' ? '✗ مرفوض' : '⏳ بانتظار';
+    const ocr = d.ocr === 'completed' ? '| OCR ✓' : d.ocr === 'failed' ? '| OCR ✗' : '';
+    return `<div class="report-field"><span class="label">${escHtml(label)}</span><span class="value">${escHtml(d.fileName || key)} — ${st} ${ocr}</span></div>`;
+  };
+
+  el.innerHTML = `
+    <div class="report-header">
+      <h1>🏛️ تقرير اعرف زبونك (KYC) — البنك المركزي العراقي</h1>
+      <div style="font-size:13px;color:var(--text-2)">CBI Anti-Money Laundering & Counter-Terrorism Financing Compliance Report</div>
+      <div style="margin-top:.5rem;font-size:12px;color:var(--muted)">تاريخ الإنشاء: ${new Date(report.generatedAt).toLocaleString('ar-IQ')}</div>
+      <div style="margin-top:.75rem">${statusBadge}</div>
+      <div style="margin-top:.5rem">
+        <div class="progress-bar" style="max-width:300px;margin:0 auto"><div class="progress-fill" style="width:${ov.completeness}%"></div></div>
+        <div style="font-size:12px;color:var(--text-2)">اكتمال البيانات: ${ov.completeness}%</div>
+      </div>
+    </div>
+
+    <!-- Merchant Info -->
+    <div class="card report-section">
+      <div class="card-header"><h2>🏢 بيانات التاجر</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('الاسم القانوني (عربي)', report.merchantName, true)}
+          ${field('الاسم القانوني (إنجليزي)', report.merchantNameEn)}
+          ${field('الاسم التجاري', report.tradeName)}
+          ${field('رقم التسجيل', report.registrationNumber)}
+          ${field('حالة KYC', report.kycStatus)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 1: Personal Data -->
+    <div class="card report-section">
+      <div class="card-header"><h2>١. البيانات الشخصية الأساسية</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('الاسم الكامل (عربي)', owner.personalData.fullNameAr, true)}
+          ${field('اسم الأب', owner.personalData.fatherNameAr, true)}
+          ${field('اسم الجد', owner.personalData.grandfatherNameAr, true)}
+          ${field('اللقب / العائلة', owner.personalData.familyNameAr, true)}
+          ${field('اسم الأم', owner.personalData.motherNameAr, true)}
+          ${field('الاسم (إنجليزي)', owner.personalData.fullNameEn)}
+          ${field('تاريخ الميلاد', owner.personalData.dateOfBirth, true)}
+          ${field('محل الولادة', owner.personalData.placeOfBirth, true)}
+          ${field('الجنس', owner.personalData.gender, true)}
+          ${field('الجنسية', owner.personalData.nationality, true)}
+          ${field('جنسية ثانوية', owner.personalData.secondaryNationality)}
+          ${field('الحالة الاجتماعية', owner.personalData.maritalStatus)}
+          ${field('المستوى التعليمي', owner.personalData.educationLevel)}
+          ${field('فصيلة الدم', owner.personalData.bloodType)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Identification -->
+    <div class="card report-section">
+      <div class="card-header"><h2>٢. تفاصيل الهوية</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('رقم البطاقة الوطنية', owner.identification.nationalId, true)}
+          ${field('رقم السجل المدني', owner.identification.civilStatusNumber)}
+          ${field('الرقم العائلي', owner.identification.familyNumber)}
+          ${field('تاريخ اصدار البطاقة', owner.identification.nationalIdIssueDate, true)}
+          ${field('تاريخ نفاذ البطاقة', owner.identification.nationalIdExpiry, true)}
+          ${field('جهة الاصدار', owner.identification.nationalIdIssuingOffice)}
+          ${field('رقم الجواز', owner.identification.passportNumber)}
+          ${field('تاريخ اصدار الجواز', owner.identification.passportIssueDate)}
+          ${field('تاريخ نفاذ الجواز', owner.identification.passportExpiry)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Address -->
+    <div class="card report-section">
+      <div class="card-header"><h2>٣. العنوان والإقامة</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('المحافظة', owner.address.governorate, true)}
+          ${field('القضاء / المنطقة', owner.address.district, true)}
+          ${field('المحلة', owner.address.neighborhood)}
+          ${field('الزقاق / الدار', owner.address.streetAddress)}
+          ${field('رقم بطاقة السكن', owner.address.residencyCardNumber)}
+          ${field('رقم الهاتف', owner.address.phone, true)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Employment -->
+    <div class="card report-section">
+      <div class="card-header"><h2>٤. المعلومات الوظيفية والمالية</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('المهنة', owner.employment.occupation, true)}
+          ${field('جهة العمل', owner.employment.employerName)}
+          ${field('الدخل الشهري', owner.employment.monthlyIncome ? (owner.employment.monthlyIncome + ' ' + (owner.employment.incomeCurrency || 'IQD')) : null)}
+          ${field('حجم التعاملات المتوقعة', owner.employment.expectedMonthlyVolume)}
+          ${field('مصدر الأموال', owner.employment.sourceOfFunds, true)}
+          ${field('الغرض من الحساب', owner.employment.purposeOfAccount)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Compliance -->
+    <div class="card report-section">
+      <div class="card-header"><h2>٥. الامتثال والفحص</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('شخص مكشوف سياسياً (ذاتي)', owner.compliance.isPepSelf ? 'نعم ⚠️' : 'لا')}
+          ${field('PEP عائلي', owner.compliance.isPepFamily ? 'نعم ⚠️' : 'لا')}
+          ${field('تفاصيل PEP', owner.compliance.pepDetails)}
+          ${field('المستفيد الحقيقي', owner.compliance.isBeneficialOwner !== false ? 'نفسه' : 'شخص آخر ⚠️')}
+          ${field('تفاصيل UBO', owner.compliance.uboDetails)}
+          ${field('نتيجة الفحص (عقوبات)', owner.compliance.screeningStatus)}
+          ${field('نسبة الملكية', owner.ownershipPct ? owner.ownershipPct + '%' : null)}
+          ${field('الدور / المنصب', owner.role)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Documents Checklist -->
+    <div class="card report-section">
+      <div class="card-header"><h2>٦. قائمة الوثائق المرفقة</h2></div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${docStatus('national_id_front', 'البطاقة الوطنية — أمامي')}
+          ${docStatus('national_id_back', 'البطاقة الوطنية — خلفي')}
+          ${docStatus('passport', 'جواز السفر')}
+          ${docStatus('resident_id', 'بطاقة السكن')}
+        </div>
+        ${owner.missingDocs.length > 0 ? `<div class="alert alert-warn" style="margin-top:.75rem">⚠ وثائق ناقصة: ${owner.missingDocs.map(d => escHtml(d)).join('، ')}</div>` : ''}
+        ${owner.missingFields.length > 0 ? `<div class="alert alert-warn" style="margin-top:.5rem">⚠ حقول ناقصة (${owner.missingFields.length}): ${owner.missingFields.map(f => escHtml(f.replace(/_/g, ' '))).join('، ')}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    ${report.alerts && report.alerts.length > 0 ? `
+    <div class="card report-section">
+      <div class="card-header"><h2>⚠️ التنبيهات</h2></div>
+      <div class="card-body">
+        ${report.alerts.map(a => `<div class="alert alert-${a.severity === 'critical' ? 'danger' : 'warn'}">
+          <strong>${escHtml(a.severity)}</strong> — ${escHtml(a.alert_type)}: ${escHtml(JSON.stringify(a.details || {}))}
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Screening -->
+    ${report.screening && report.screening.length > 0 ? `
+    <div class="card report-section">
+      <div class="card-header"><h2>🔍 نتائج فحص العقوبات</h2></div>
+      <div class="card-body">
+        ${report.screening.map(s => `<div class="report-field">
+          <span class="label">${escHtml(s.entity_name)}</span>
+          <span class="value">${s.matched_name ? escHtml(s.matched_name) + ' (score: ' + s.match_score + ')' : 'لا تطابق'}</span>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Overall Verdict -->
+    <div class="card report-section" style="border:2px solid ${ov.kycReady ? 'var(--ok)' : 'var(--warn)'}">
+      <div class="card-header" style="background:${ov.kycReady ? 'var(--ok-bg)' : 'var(--warn-bg)'}">
+        <h2>${ov.kycReady ? '✅ KYC مكتمل وجاهز للاعتماد' : '⚠️ KYC غير مكتمل'}</h2>
+      </div>
+      <div class="card-body">
+        <div class="report-fieldgroup">
+          ${field('اكتمال البيانات', ov.completeness + '%')}
+          ${field('جميع الوثائق مرفوعة', ov.allDocsUploaded ? '✓ نعم' : '✗ لا')}
+          ${field('جميع الوثائق مصدّقة', ov.allDocsVerified ? '✓ نعم' : '✗ لا')}
+          ${field('فحص العقوبات', ov.screeningClear ? '✓ نظيف' : '⚠ يحتاج مراجعة')}
+          ${field('تنبيهات مفتوحة', ov.openAlerts)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', loadMerchants);
+</script>
+</body>
+</html>

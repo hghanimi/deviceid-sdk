@@ -41,6 +41,6 @@
 			"node"
 		]
 	},
-	"exclude": ["test"],
+	"exclude": ["test", "src/migrate.ts"],
 	"include": ["worker-configuration.d.ts", "src/**/*.ts"]
 }

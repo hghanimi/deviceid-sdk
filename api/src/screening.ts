@@ -710,7 +710,7 @@ export class OpenSanctionsScreener {
       const pep: ScreenMatch[] = [];
 
       for (const r of results) {
-        if (r.score < 0.50) continue; // Very low scores — skip
+        if (r.score < 0.70) continue; // Require strong match — no partial name flags
 
         const datasets = r.datasets || [];
         const isPEP = datasets.some(d =>
@@ -801,7 +801,7 @@ export class OpenSanctionsScreener {
 
       const sanctions: ScreenMatch[] = [];
       for (const r of results) {
-        if (r.score < 0.50) continue;
+        if (r.score < 0.70) continue; // Require strong match for orgs too
         sanctions.push({
           matchScore: Math.round(r.score * 10000) / 10000,
           matchedName: r.caption || r.properties?.name?.[0] || 'Unknown',
@@ -899,7 +899,40 @@ function dedupeKey(m: ScreenMatch): string {
 
 // ─── screenEntity (local only) ─────────────────────────────────────────────────
 
-const MATCH_THRESHOLD = 0.85;
+// Raised threshold: require near-full-name match to flag (no partial first/last name matches)
+const MATCH_THRESHOLD = 0.92;
+
+/**
+ * Token-level full-name matching: requires ALL tokens in the query to have
+ * a corresponding high-similarity token in the target. This prevents flagging
+ * when only the first name or last name matches (e.g. "محمد" alone).
+ */
+function fullNameTokenMatch(query: string, target: string): boolean {
+  const qIsAr = /[\u0600-\u06FF]/.test(query);
+  const tIsAr = /[\u0600-\u06FF]/.test(target);
+
+  const normalize = (s: string, ar: boolean) => ar ? normalizeArabic(s) : normalizeLatin(s);
+  const qTokens = normalize(query, qIsAr).split(/\s+/).filter(t => t.length > 1);
+  const tTokens = normalize(target, tIsAr).split(/\s+/).filter(t => t.length > 1);
+
+  if (qTokens.length === 0 || tTokens.length === 0) return false;
+  // Require at least 2 tokens to match (no single-name flags)
+  if (qTokens.length < 2 && tTokens.length < 2) return false;
+
+  // For cross-script, transliterate both to Latin
+  const qLatin = qTokens.map(t => qIsAr ? transliterateArabic(t) : normalizeLatin(t));
+  const tLatin = tTokens.map(t => tIsAr ? transliterateArabic(t) : normalizeLatin(t));
+
+  let matched = 0;
+  for (const qt of qLatin) {
+    const hasMatch = tLatin.some(tt => jaroWinkler(qt, tt) >= 0.88);
+    if (hasMatch) matched++;
+  }
+
+  // Require at least 80% of query tokens to match target tokens
+  const ratio = matched / qLatin.length;
+  return ratio >= 0.8;
+}
 
 export async function screenEntity(
   input: ScreenEntityInput,
@@ -919,6 +952,7 @@ export async function screenEntity(
   for (const entry of entries) {
     let bestScore = 0;
     let bestQueryName = '';
+    let bestTargetName = '';
 
     // Compare each query name against primary name + aliases
     const targetNames = [entry.name, ...entry.aliases];
@@ -929,29 +963,33 @@ export async function screenEntity(
         if (score > bestScore) {
           bestScore = score;
           bestQueryName = qName;
+          bestTargetName = tName;
         }
       }
     }
 
     // Apply DOB/nationality boosting
-    if (bestScore >= MATCH_THRESHOLD * 0.9) { // Check near-threshold too
+    if (bestScore >= MATCH_THRESHOLD * 0.95) {
       if (input.dateOfBirth && entry.dateOfBirth) {
         if (input.dateOfBirth === entry.dateOfBirth) {
-          bestScore = Math.min(1.0, bestScore + 0.05); // DOB match boosts
+          bestScore = Math.min(1.0, bestScore + 0.04);
         } else {
-          bestScore -= 0.03; // DOB mismatch reduces confidence slightly
+          bestScore -= 0.03;
         }
       }
       if (input.nationality && entry.nationality) {
         const qNat = input.nationality.toLowerCase();
         const tNat = entry.nationality.toLowerCase();
         if (qNat === tNat || qNat.includes(tNat) || tNat.includes(qNat)) {
-          bestScore = Math.min(1.0, bestScore + 0.03);
+          bestScore = Math.min(1.0, bestScore + 0.02);
         }
       }
     }
 
     if (bestScore >= MATCH_THRESHOLD) {
+      // CRITICAL: Require full-name token match — reject partial (first-name-only or last-name-only) hits
+      if (!fullNameTokenMatch(bestQueryName, bestTargetName)) continue;
+
       matches.push({
         matchScore: Math.round(bestScore * 10000) / 10000,
         matchedName: entry.name,
@@ -970,7 +1008,7 @@ export async function screenEntity(
 
 // ─── screenMerchant (DB-integrated, Composite) ───────────────────────────────
 
-const ALERT_THRESHOLD = 0.75;
+const ALERT_THRESHOLD = 0.90;
 
 export async function screenMerchant(
   db: any,
@@ -1034,7 +1072,7 @@ export async function screenMerchant(
         match.matchScore,
         match.listSource,
         match.entityId,
-        JSON.stringify(match.programs),
+        match.programs || [],
         JSON.stringify({ queriedName: match.queriedName, isPEP: false, datasets: match.datasets }),
       ],
     );
@@ -1088,7 +1126,7 @@ export async function screenMerchant(
           match.matchScore,
           match.listSource,
           match.entityId,
-          JSON.stringify(match.programs),
+          match.programs || [],
           JSON.stringify({ queriedName: match.queriedName, dateOfBirth: input.dateOfBirth, isPEP: false, datasets: match.datasets }),
         ],
       );
@@ -1107,7 +1145,7 @@ export async function screenMerchant(
           match.matchScore,
           'PEP',
           match.entityId,
-          JSON.stringify(match.programs),
+          match.programs || [],
           JSON.stringify({ queriedName: match.queriedName, isPEP: true, datasets: match.datasets }),
         ],
       );

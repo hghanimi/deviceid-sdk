@@ -1,0 +1,894 @@
+﻿<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Athar - Compliance Portal</title>
+<style>
+:root {
+  --bg: #f1f5f9; --surface: #ffffff; --surface2: #f8fafc; --border: #e2e8f0;
+  --text: #1e293b; --muted: #64748b; --accent: #10b981; --accent2: #059669;
+  --danger: #ef4444; --warn: #f59e0b; --info: #3b82f6; --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.hidden{display:none!important}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Login */
+#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#ecfdf5 0%,#f0f9ff 100%)}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px 40px;width:420px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.06)}
+.login-card h1{font-size:2rem;margin-bottom:4px;color:var(--accent)}
+.login-card p{color:var(--muted);margin-bottom:32px;font-size:0.95rem}
+.fg{text-align:left;margin-bottom:16px}
+.fg label{display:block;color:var(--muted);font-size:0.82rem;margin-bottom:5px;font-weight:600}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.95rem}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(16,185,129,0.1)}
+.btn{padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:600;transition:all 0.15s}
+.btn-primary{background:var(--accent);color:#fff;width:100%;padding:12px}
+.btn-primary:hover{background:var(--accent2)}
+.btn-sm{padding:7px 18px;font-size:0.85rem;width:auto}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-info{background:var(--info);color:#fff}
+.btn-warn{background:var(--warn);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.error-msg{color:var(--danger);font-size:0.85rem;margin-top:12px}
+
+/* Shell */
+#appShell{display:flex;min-height:100vh}
+.sidebar{width:230px;background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .logo{color:var(--accent);font-size:1.4rem;font-weight:800;text-align:center;margin-bottom:4px}
+.sidebar .org-name{color:var(--muted);font-size:0.75rem;text-align:center;margin-bottom:28px}
+.nav-item{padding:9px 14px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:0.86rem;margin-bottom:3px;transition:all 0.15s;display:flex;align-items:center;gap:9px;font-weight:500}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent);color:#fff;font-weight:600}
+.sidebar-bottom{margin-top:auto}
+.user-info{color:var(--muted);font-size:0.78rem;padding:12px 8px;border-top:1px solid var(--border)}
+.main-content{flex:1;padding:28px 32px;overflow-y:auto}
+
+/* Cards */
+.page-title{font-size:1.4rem;font-weight:700;margin-bottom:20px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.stat-card .value{font-size:1.8rem;font-weight:800;color:var(--accent)}
+.stat-card .label{color:var(--muted);font-size:0.82rem;margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:18px;box-shadow:var(--shadow)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.card-header h3{font-size:1.05rem;font-weight:600}
+
+/* Table */
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:0.88rem}
+th{color:var(--muted);font-weight:600;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.4px;background:var(--surface2)}
+tr:hover td{background:var(--surface2)}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.73rem;font-weight:600}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-approved{background:#d1fae5;color:#065f46}
+.badge-rejected{background:#fee2e2;color:#991b1b}
+.badge-review{background:#dbeafe;color:#1e40af}
+.badge-clear{background:#d1fae5;color:#065f46}
+.badge-hit{background:#fee2e2;color:#991b1b}
+
+/* Tabs */
+.tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:7px 18px;border-radius:8px;cursor:pointer;font-size:0.84rem;background:var(--surface2);color:var(--muted);border:1px solid var(--border);font-weight:500}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab:hover:not(.active){background:var(--border);color:var(--text)}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:90%;max-width:640px;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
+.modal h2{margin-bottom:20px;font-size:1.2rem}
+
+/* Steps */
+.step-bar{display:flex;justify-content:center;gap:6px;margin-bottom:28px;align-items:center}
+.step-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.82rem;background:var(--surface2);color:var(--muted);border:2px solid var(--border)}
+.step-dot.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.step-dot.done{background:var(--accent2);color:#fff;border-color:var(--accent)}
+.step-line{width:36px;height:2px;background:var(--border)}
+.step-line.done{background:var(--accent)}
+.step-label{font-size:0.68rem;color:var(--muted);text-align:center;margin-top:3px}
+
+/* Upload */
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:28px;text-align:center;cursor:pointer;transition:all 0.15s;margin-bottom:10px;background:var(--surface2)}
+.upload-zone:hover{border-color:var(--accent);background:rgba(16,185,129,0.04)}
+.upload-zone input{display:none}
+.file-preview{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
+.file-preview img{width:44px;height:44px;object-fit:cover;border-radius:6px}
+
+/* Alerts */
+.alert-item{display:flex;gap:12px;padding:14px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);margin-bottom:8px;align-items:flex-start}
+.alert-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.alert-dot.critical{background:var(--danger)}
+.alert-dot.high{background:var(--warn)}
+.alert-dot.medium{background:var(--info)}
+.alert-dot.low{background:var(--muted)}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999}
+.toast{padding:12px 24px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;margin-bottom:8px;animation:fadeIn .3s;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.toast.error{background:var(--danger)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Spinner */
+.spinner{width:22px;height:22px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-full{display:flex;align-items:center;justify-content:center;padding:50px;flex-direction:column;gap:14px;color:var(--muted)}
+
+/* OCR */
+.ocr-result{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:8px}
+.ocr-field{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.84rem}
+.ocr-field:last-child{border-bottom:none}
+.ocr-key{color:var(--muted)}
+.ocr-val{font-weight:600}
+
+/* OCR filled field highlight */
+.ocr-filled{background:#ecfdf5!important;border-color:#a7f3d0!important}
+.field-missing{background:#fffbeb!important;border-color:#fde68a!important}
+
+/* Fingerprint integration box */
+.code-box{background:#1e293b;color:#e2e8f0;border-radius:8px;padding:16px;font-family:'Fira Code',monospace;font-size:0.82rem;overflow-x:auto;position:relative}
+.code-box button{position:absolute;top:8px;right:8px;padding:4px 10px;border-radius:4px;border:1px solid #475569;background:#334155;color:#e2e8f0;cursor:pointer;font-size:0.75rem}
+
+/* Responsive */
+@media(max-width:768px){
+  #appShell{flex-direction:column}
+  .sidebar{width:100%;flex-direction:row;padding:10px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border)}
+  .sidebar .logo,.sidebar .org-name,.sidebar-bottom{display:none}
+  .nav-item{white-space:nowrap;font-size:0.78rem;padding:7px 10px}
+  .main-content{padding:14px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- LOGIN -->
+<div id="loginPage">
+  <div class="login-card">
+    <h1>Athar</h1>
+    <p>Compliance &amp; Device Intelligence Portal</p>
+    <div class="fg"><label>Username</label><input type="text" id="loginUser" placeholder="username" autocomplete="username"></div>
+    <div class="fg"><label>Password</label><input type="password" id="loginPass" placeholder="password" autocomplete="current-password"></div>
+    <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+    <div id="loginError" class="error-msg hidden"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell" class="hidden">
+  <aside class="sidebar">
+    <div class="logo">Athar</div>
+    <div class="org-name" id="orgName"></div>
+    <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">&#x1F4CA; Dashboard</div>
+    <div class="nav-item" data-page="merchants" onclick="showPage('merchants')">&#x1F3EA; Merchants</div>
+    <div class="nav-item" data-page="onboarding" onclick="showPage('onboarding')">&#x2795; New Merchant</div>
+    <div class="nav-item" data-page="screening" onclick="showPage('screening')">&#x1F50D; Screening</div>
+    <div class="nav-item" data-page="alerts" onclick="showPage('alerts')">&#x1F514; Alerts</div>
+    <div class="nav-item" data-page="activity" onclick="showPage('activity')">&#x1F4CB; Activity</div>
+    <div class="sidebar-bottom">
+      <div class="user-info">
+        <div id="userDisplay"></div>
+        <div style="margin-top:6px"><a href="#" onclick="doLogout()" style="color:var(--danger);font-size:0.78rem">Sign Out</a></div>
+      </div>
+    </div>
+  </aside>
+  <main class="main-content">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page-section">
+      <h2 class="page-title">Dashboard</h2>
+      <div class="stats-grid" id="dashStats"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+        <div class="card"><div class="card-header"><h3>Recent Merchants</h3></div><div id="dashMerchants"></div></div>
+        <div class="card"><div class="card-header"><h3>Open Alerts</h3></div><div id="dashAlerts"></div></div>
+      </div>
+    </div>
+
+    <!-- MERCHANTS LIST -->
+    <div id="page-merchants" class="page-section hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h2 class="page-title" style="margin:0">Merchants</h2>
+        <button class="btn btn-primary btn-sm" onclick="showPage('onboarding')">+ New Merchant</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table><thead><tr><th>Business</th><th>Legal Name</th><th>KYC</th><th>Screening</th><th>Risk</th><th>Docs</th><th>Devices</th><th>Date</th><th></th></tr></thead>
+        <tbody id="merchantsTable"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ONBOARDING: Upload first -> OCR -> Fill -> Save -> Link -->
+    <div id="page-onboarding" class="page-section hidden">
+      <h2 class="page-title">New Merchant KYC</h2>
+      <div class="step-bar">
+        <div><div class="step-dot active" data-s="1">1</div><div class="step-label">Upload</div></div>
+        <div class="step-line" data-sl="1"></div>
+        <div><div class="step-dot" data-s="2">2</div><div class="step-label">OCR &amp; Fill</div></div>
+        <div class="step-line" data-sl="2"></div>
+        <div><div class="step-dot" data-s="3">3</div><div class="step-label">Complete KYC</div></div>
+        <div class="step-line" data-sl="3"></div>
+        <div><div class="step-dot" data-s="4">4</div><div class="step-label">Save &amp; Link</div></div>
+      </div>
+
+      <!-- STEP 1: Upload Documents -->
+      <div id="onb-step1" class="card">
+        <h3 style="margin-bottom:6px">Step 1: Upload Documents</h3>
+        <p style="color:var(--muted);margin-bottom:18px;font-size:0.85rem">Upload ID documents first. OCR will auto-extract the merchant and owner details.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <label style="font-weight:600;font-size:0.88rem;display:block;margin-bottom:6px">National ID - Front *</label>
+            <div class="upload-zone" onclick="this.querySelector('input').click()">
+              <input type="file" accept="image/*" onchange="onFileSelect(this,'nid_front')">
+              <div style="font-size:1.6rem">&#x1F4F7;</div>
+              <div style="color:var(--muted);font-size:0.84rem">Click to upload</div>
+            </div>
+            <div id="preview_nid_front"></div>
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:0.88rem;display:block;margin-bottom:6px">National ID - Back</label>
+            <div class="upload-zone" onclick="this.querySelector('input').click()">
+              <input type="file" accept="image/*" onchange="onFileSelect(this,'nid_back')">
+              <div style="font-size:1.6rem">&#x1F4F7;</div>
+              <div style="color:var(--muted);font-size:0.84rem">Click to upload</div>
+            </div>
+            <div id="preview_nid_back"></div>
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:0.88rem;display:block;margin-bottom:6px">Passport</label>
+            <div class="upload-zone" onclick="this.querySelector('input').click()">
+              <input type="file" accept="image/*" onchange="onFileSelect(this,'passport')">
+              <div style="font-size:1.6rem">&#x1F4F7;</div>
+              <div style="color:var(--muted);font-size:0.84rem">Click to upload</div>
+            </div>
+            <div id="preview_passport"></div>
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:0.88rem;display:block;margin-bottom:6px">Business License</label>
+            <div class="upload-zone" onclick="this.querySelector('input').click()">
+              <input type="file" accept="image/*,.pdf" onchange="onFileSelect(this,'business_license')">
+              <div style="font-size:1.6rem">&#x1F4C4;</div>
+              <div style="color:var(--muted);font-size:0.84rem">Click to upload</div>
+            </div>
+            <div id="preview_business_license"></div>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:18px">
+          <button class="btn btn-primary btn-sm" onclick="runOcrAndProceed()">Upload &amp; Run OCR &#x2192;</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: OCR Results + Auto-filled form -->
+      <div id="onb-step2" class="card hidden">
+        <h3 style="margin-bottom:6px">Step 2: OCR Extracted Data</h3>
+        <p style="color:var(--muted);margin-bottom:18px;font-size:0.85rem">Fields extracted by OCR are highlighted in <span style="background:#ecfdf5;padding:2px 6px;border-radius:4px;font-size:0.8rem">green</span>. Missing fields in <span style="background:#fffbeb;padding:2px 6px;border-radius:4px;font-size:0.8rem">yellow</span> need manual entry.</p>
+        <div id="ocrStatusArea" style="margin-bottom:16px"></div>
+        <h4 style="margin-bottom:12px;color:var(--muted);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px">Owner / Person Details (from ID)</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Full Name (Arabic) *</label><input id="ow_nameAr" dir="rtl"></div>
+          <div class="fg"><label>Full Name (English)</label><input id="ow_nameEn"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Father's Name</label><input id="ow_father" dir="rtl"></div>
+          <div class="fg"><label>Grandfather's Name</label><input id="ow_grand" dir="rtl"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Family Name</label><input id="ow_family" dir="rtl"></div>
+          <div class="fg"><label>Mother's Name</label><input id="ow_mother" dir="rtl"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="fg"><label>Date of Birth</label><input type="date" id="ow_dob"></div>
+          <div class="fg"><label>Gender</label><select id="ow_gender"><option value="">Select</option><option value="male">Male</option><option value="female">Female</option></select></div>
+          <div class="fg"><label>Nationality</label><input id="ow_nation" value="Iraqi"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>National ID Number</label><input id="ow_nid"></div>
+          <div class="fg"><label>Passport Number</label><input id="ow_passport"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Place of Birth</label><input id="ow_pob" dir="rtl"></div>
+          <div class="fg"><label>Phone</label><input id="ow_phone"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:18px">
+          <button class="btn btn-outline btn-sm" onclick="onbGo(1)">&#x2190; Back</button>
+          <button class="btn btn-primary btn-sm" onclick="onbGo(3)">Next &#x2192;</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Complete Business KYC -->
+      <div id="onb-step3" class="card hidden">
+        <h3 style="margin-bottom:6px">Step 3: Complete KYC Details</h3>
+        <p style="color:var(--muted);margin-bottom:18px;font-size:0.85rem">Fill in the remaining business and compliance information.</p>
+        <h4 style="margin-bottom:12px;color:var(--muted);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px">Business Information</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Legal Name (Arabic) *</label><input id="ob_legalAr" dir="rtl"></div>
+          <div class="fg"><label>Legal Name (English)</label><input id="ob_legalEn"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Trade Name</label><input id="ob_trade"></div>
+          <div class="fg"><label>Business Type</label>
+            <select id="ob_bizType"><option value="">Select...</option><option value="trading">Trading</option><option value="services">Services</option><option value="manufacturing">Manufacturing</option><option value="contracting">Contracting</option><option value="money_exchange">Money Exchange</option><option value="money_transfer">Money Transfer</option><option value="other">Other</option></select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Registration Number</label><input id="ob_regNo"></div>
+          <div class="fg"><label>Tax ID</label><input id="ob_taxId"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Governorate</label><input id="ob_gov"></div>
+          <div class="fg"><label>City</label><input id="ob_city"></div>
+        </div>
+        <div class="fg"><label>Address</label><input id="ob_addr"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Phone</label><input id="ob_phone"></div>
+          <div class="fg"><label>Email</label><input id="ob_email"></div>
+        </div>
+        <h4 style="margin:18px 0 12px;color:var(--muted);font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px">Owner Compliance</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Occupation</label><input id="ow_occ"></div>
+          <div class="fg"><label>Source of Funds</label><input id="ow_funds"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="fg"><label>Ownership %</label><input type="number" id="ow_pct" value="100" min="0" max="100"></div>
+          <div class="fg"><label>Role</label><select id="ow_role"><option value="owner">Owner</option><option value="manager">Manager</option><option value="partner">Partner</option><option value="signatory">Authorized Signatory</option></select></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:18px">
+          <button class="btn btn-outline btn-sm" onclick="onbGo(2)">&#x2190; Back</button>
+          <button class="btn btn-primary btn-sm" onclick="onbGo(4)">Review &amp; Save &#x2192;</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: Review, Save & Link -->
+      <div id="onb-step4" class="card hidden">
+        <h3 style="margin-bottom:6px">Step 4: Review, Save &amp; Link to Fingerprint</h3>
+        <p style="color:var(--muted);margin-bottom:18px;font-size:0.85rem">Review all details, then save. After saving, this merchant will be linked to your device intelligence dashboard.</p>
+        <div id="reviewSummary"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:18px">
+          <button class="btn btn-outline btn-sm" onclick="onbGo(3)">&#x2190; Back</button>
+          <button class="btn btn-primary btn-sm" id="submitOnbBtn" onclick="submitOnboarding()">&#x2713; Save Merchant &amp; Link</button>
+        </div>
+      </div>
+
+      <!-- POST-SAVE: Fingerprint Link -->
+      <div id="onb-step5" class="card hidden">
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:2.5rem;margin-bottom:8px">&#x2705;</div>
+          <h3 style="margin-bottom:6px">Merchant Saved &amp; KYC Started</h3>
+          <p style="color:var(--muted);font-size:0.85rem;margin-bottom:20px">Documents uploaded, sanctions screening running, KYC populated.</p>
+        </div>
+        <div id="fingerprintLinkSection"></div>
+        <div style="text-align:center;margin-top:20px">
+          <button class="btn btn-primary btn-sm" onclick="viewMerchant(onbMerchant.id)">View Merchant Details &#x2192;</button>
+          <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="showPage('dashboard')">Back to Dashboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MERCHANT DETAIL -->
+    <div id="page-merchant-detail" class="page-section hidden">
+      <div style="margin-bottom:14px"><a href="#" onclick="showPage('merchants')">&#x2190; Back to Merchants</a></div>
+      <div id="merchantDetail"></div>
+    </div>
+
+    <!-- SCREENING -->
+    <div id="page-screening" class="page-section hidden">
+      <h2 class="page-title">Sanctions Screening</h2>
+      <div class="card">
+        <h3 style="margin-bottom:14px">Manual Name Check</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:14px">Check any name against OFAC, UN, EU, and OpenSanctions lists.</p>
+        <div style="display:flex;gap:10px;margin-bottom:14px">
+          <input id="screenName" placeholder="Enter full name..." style="flex:1;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text)">
+          <select id="screenType" style="padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text)"><option value="person">Person</option><option value="company">Company</option></select>
+          <button class="btn btn-primary btn-sm" onclick="manualScreen()">Screen</button>
+        </div>
+        <div id="screenResults"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-header"><h3>Batch Re-screening</h3><button class="btn btn-warn btn-sm" onclick="batchScreen()">Re-screen All</button></div>
+        <p style="color:var(--muted);font-size:0.85rem">Re-screens all merchants and owners against updated sanctions lists.</p>
+      </div>
+    </div>
+
+    <!-- ALERTS -->
+    <div id="page-alerts" class="page-section hidden">
+      <h2 class="page-title">Alerts</h2>
+      <div class="tabs" id="alertTabs">
+        <div class="tab active" onclick="filterAlerts('open')">Open</div>
+        <div class="tab" onclick="filterAlerts('all')">All</div>
+        <div class="tab" onclick="filterAlerts('critical')">Critical</div>
+        <div class="tab" onclick="filterAlerts('resolved')">Resolved</div>
+      </div>
+      <div id="alertsList"></div>
+    </div>
+
+    <!-- ACTIVITY -->
+    <div id="page-activity" class="page-section hidden">
+      <h2 class="page-title">Activity Log</h2>
+      <div id="activityList"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+var API='https://api.arch-hayder.workers.dev';
+var session=null,dashData=null,allAlerts=[],pendingFiles={},onbMerchant=null,ocrResults={};
+
+// ---- AUTH ----
+function doLogin(){
+  var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
+  if(!u||!p)return showLoginError('Enter username and password');
+  showLoginError('');
+  var key=localStorage.getItem('athar_apikey');
+  if(!key){showApiKeyPrompt();return;}
+  apiCall('POST','/v1/auth/login',{username:u,password:p},key).then(function(d){
+    session=d;localStorage.setItem('athar_apikey',d.apiKey);localStorage.setItem('athar_session',JSON.stringify(d));enterApp();
+  }).catch(function(e){showLoginError(e.message);});
+}
+function showApiKeyPrompt(){
+  if(document.getElementById('apiKeyGroup'))return;
+  var g=document.createElement('div');g.className='fg';g.id='apiKeyGroup';g.style.marginTop='16px';
+  g.innerHTML='<label>API Key (first-time setup)</label><input type="text" id="bootstrapKey" placeholder="pk_live_..."><button class="btn btn-primary" style="margin-top:10px" onclick="bootstrapLogin()">Sign In with API Key</button><p style="color:var(--muted);font-size:0.73rem;margin-top:6px">After first login, only username + password needed.</p>';
+  document.querySelector('.login-card').appendChild(g);
+}
+function bootstrapLogin(){
+  var key=document.getElementById('bootstrapKey').value.trim(),u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
+  if(!key)return showLoginError('Enter API key');if(!u||!p)return showLoginError('Enter username and password');
+  apiCall('POST','/v1/auth/login',{username:u,password:p},key).then(function(d){
+    session=d;localStorage.setItem('athar_apikey',d.apiKey);localStorage.setItem('athar_session',JSON.stringify(d));enterApp();
+  }).catch(function(e){showLoginError(e.message);});
+}
+function showLoginError(m){var e=document.getElementById('loginError');if(m){e.textContent=m;e.classList.remove('hidden');}else e.classList.add('hidden');}
+function doLogout(){session=null;localStorage.removeItem('athar_session');document.getElementById('appShell').classList.add('hidden');document.getElementById('loginPage').classList.remove('hidden');}
+function tryRestore(){var s=localStorage.getItem('athar_session');if(s){try{session=JSON.parse(s);if(session&&session.apiKey){enterApp();return;}}catch(e){}}document.getElementById('loginPage').classList.remove('hidden');}
+function enterApp(){document.getElementById('loginPage').classList.add('hidden');document.getElementById('appShell').classList.remove('hidden');document.getElementById('orgName').textContent=session.keyName||'';document.getElementById('userDisplay').textContent=(session.user?session.user.displayName||session.user.username:'')+' ('+(session.keyName||'')+')';showPage('dashboard');}
+
+// ---- API ----
+async function apiCall(method,path,body,keyOverride){
+  var key=keyOverride||(session?session.apiKey:null)||localStorage.getItem('athar_apikey');
+  var opts={method:method,headers:{'X-API-Key':key}};
+  if(body&&method!=='GET'){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  var res=await fetch(API+path,opts);var data=await res.json();
+  if(!res.ok)throw new Error(data.error||'HTTP '+res.status);return data;
+}
+async function apiUpload(path,fd){
+  var key=(session?session.apiKey:null)||localStorage.getItem('athar_apikey');
+  var res=await fetch(API+path,{method:'POST',headers:{'X-API-Key':key},body:fd});
+  var data=await res.json();if(!res.ok)throw new Error(data.error||'HTTP '+res.status);return data;
+}
+
+// ---- NAV ----
+function showPage(id){
+  document.querySelectorAll('.page-section').forEach(function(el){el.classList.add('hidden');});
+  document.querySelectorAll('.nav-item').forEach(function(el){el.classList.remove('active');});
+  var pg=document.getElementById('page-'+id);if(pg)pg.classList.remove('hidden');
+  var nv=document.querySelector('.nav-item[data-page="'+id+'"]');if(nv)nv.classList.add('active');
+  if(id==='dashboard')loadDashboard();
+  else if(id==='merchants')loadMerchants();
+  else if(id==='alerts')loadAlerts();
+  else if(id==='activity')loadActivity();
+  else if(id==='onboarding')resetOnboarding();
+}
+
+// ---- DASHBOARD ----
+async function loadDashboard(){
+  var c=document.getElementById('dashStats');c.innerHTML='<div class="loading-full"><div class="spinner"></div></div>';
+  try{
+    dashData=await apiCall('GET','/v1/portal/dashboard');var k=dashData.kycStats,d=dashData.docStats;
+    c.innerHTML='<div class="stat-card"><div class="value">'+k.total+'</div><div class="label">Total Merchants</div></div><div class="stat-card"><div class="value" style="color:var(--warn)">'+k.pending+'</div><div class="label">Pending</div></div><div class="stat-card"><div class="value" style="color:var(--info)">'+k.underReview+'</div><div class="label">Under Review</div></div><div class="stat-card"><div class="value">'+k.approved+'</div><div class="label">Approved</div></div><div class="stat-card"><div class="value" style="color:var(--danger)">'+dashData.openAlerts+'</div><div class="label">Open Alerts</div></div><div class="stat-card"><div class="value">'+d.total+'</div><div class="label">Documents</div></div>';
+    document.getElementById('dashMerchants').innerHTML=(dashData.merchants||[]).slice(0,5).map(function(m){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)"><div><div style="font-weight:600;font-size:0.9rem">'+esc(m.legal_name_ar||m.trade_name||'Unnamed')+'</div><div style="color:var(--muted);font-size:0.78rem">'+esc(m.legal_name_en||'')+'</div></div><div style="display:flex;gap:6px;align-items:center">'+kycBadge(m.kyc_status)+'<button class="btn btn-outline btn-sm" style="font-size:0.78rem" onclick="viewMerchant(\''+m.id+'\')">View</button></div></div>';}).join('')||'<p style="color:var(--muted);padding:12px">No merchants yet. Click "New Merchant" to start.</p>';
+    document.getElementById('dashAlerts').innerHTML=(dashData.recentAlerts||[]).slice(0,5).map(function(a){return '<div class="alert-item" style="padding:9px"><div class="alert-dot '+(a.severity||'medium')+'"></div><div style="flex:1"><div style="font-weight:600;font-size:0.85rem">'+esc(a.alert_type||'Alert')+'</div><div style="color:var(--muted);font-size:0.78rem">'+esc(parseDetails(a.details))+'</div></div><div style="color:var(--muted);font-size:0.73rem">'+timeAgo(a.created_at)+'</div></div>';}).join('')||'<p style="color:var(--muted);padding:12px">No alerts</p>';
+  }catch(e){c.innerHTML='<p class="error-msg">'+esc(e.message)+'</p>';}
+}
+
+// ---- MERCHANTS ----
+async function loadMerchants(){
+  var tb=document.getElementById('merchantsTable');tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px"><div class="spinner"></div></td></tr>';
+  try{
+    if(!dashData)dashData=await apiCall('GET','/v1/portal/dashboard');var ms=dashData.merchants||[];
+    if(!ms.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px">No merchants. Click "+ New Merchant" to start KYC.</td></tr>';return;}
+    tb.innerHTML=ms.map(function(m){return '<tr><td style="font-weight:600">'+esc(m.trade_name||'-')+'</td><td>'+esc(m.legal_name_ar||'-')+'</td><td>'+kycBadge(m.kyc_status)+'</td><td>'+screenBadge(m.screening_status)+'</td><td>'+riskBadge(m.risk_rating)+'</td><td>'+((m.documents||[]).length)+'</td><td><span class="badge badge-review">Linked</span></td><td style="color:var(--muted);font-size:0.78rem">'+fmtDate(m.created_at)+'</td><td><button class="btn btn-outline btn-sm" style="font-size:0.78rem" onclick="viewMerchant(\''+m.id+'\')">View</button></td></tr>';}).join('');
+  }catch(e){tb.innerHTML='<tr><td colspan="9" class="error-msg">'+esc(e.message)+'</td></tr>';}
+}
+
+async function viewMerchant(id){
+  showPage('merchant-detail');var c=document.getElementById('merchantDetail');
+  c.innerHTML='<div class="loading-full"><div class="spinner"></div></div>';
+  try{
+    // Fetch fresh merchant data with owners, docs, alerts
+    var data=await apiCall('GET','/v1/merchants/'+id);
+    var m=data.merchant;if(!m){c.innerHTML='<p class="error-msg">Merchant not found</p>';return;}
+    var owners=m.owners||[],docs=m.documents||[];
+    var snippetCode='&lt;script src="https://deviceid-cdn.pages.dev/deviceid.min.js"&gt;&lt;/script&gt;\n&lt;script&gt;\nconst did = new DeviceID({\n  apiKey: \''+esc(session.apiKey||'')+'\',\n  apiEndpoint: \''+API+'/v1/fingerprint\'\n});\ndid.identify({ linkedTag: \'merchant_'+esc(id.substring(0,8))+'\' });\n&lt;/script&gt;';
+
+    // KYC status actions
+    var kycActions='';
+    if(m.kyc_status==='pending')kycActions='<button class="btn btn-info btn-sm" onclick="changeKyc(\''+id+'\',\'under_review\')">Start Review</button>';
+    else if(m.kyc_status==='under_review')kycActions='<button class="btn btn-primary btn-sm" onclick="changeKyc(\''+id+'\',\'approved\')">Approve</button> <button class="btn btn-danger btn-sm" onclick="changeKyc(\''+id+'\',\'rejected\')">Reject</button>';
+    else if(m.kyc_status==='rejected')kycActions='<button class="btn btn-info btn-sm" onclick="changeKyc(\''+id+'\',\'under_review\')">Re-open Review</button>';
+    else if(m.kyc_status==='approved')kycActions='<span class="badge badge-approved" style="font-size:0.85rem;padding:6px 14px">Approved</span>';
+
+    c.innerHTML='<div class="card"><h2 style="margin-bottom:6px">'+esc(m.legal_name_ar||m.trade_name)+'</h2><p style="color:var(--muted);margin-bottom:18px">'+esc(m.legal_name_en||'')+' '+(m.trade_name?'- '+esc(m.trade_name):'')+'</p><div class="stats-grid"><div class="stat-card"><div class="label">KYC</div><div style="margin-top:6px">'+kycBadge(m.kyc_status)+'</div><div style="margin-top:8px">'+kycActions+'</div></div><div class="stat-card"><div class="label">Screening</div><div style="margin-top:6px">'+screenBadge(m.screening_status)+'</div></div><div class="stat-card"><div class="label">Risk</div><div style="margin-top:6px">'+riskBadge(m.risk_rating)+'</div></div><div class="stat-card"><div class="label">Documents</div><div class="value">'+docs.length+'</div></div></div></div>'
+    +'<div class="card"><div class="card-header"><h3>Owners ('+owners.length+')</h3><button class="btn btn-outline btn-sm" onclick="addOwnerModal(\''+id+'\')">+ Add Owner</button></div>'+(owners.length===0?'<p style="color:var(--muted)">No owners yet. Add an owner to run screening.</p>':owners.map(function(o){return '<div style="padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px"><div style="display:flex;justify-content:space-between"><div><div style="font-weight:600">'+esc(o.full_name_ar||'-')+'</div><div style="color:var(--muted);font-size:0.8rem">'+esc(o.full_name_en||'')+' - '+esc(o.role||'')+' - '+(o.ownership_pct||0)+'%</div></div><div style="display:flex;gap:6px;align-items:center">'+screenBadge(o.screening_status)+(o.kyc_completed?' <span class="badge badge-approved">KYC</span>':'')+'<button class="btn btn-outline btn-sm" style="font-size:0.73rem" onclick="editOwnerModal(\''+o.id+'\',\''+id+'\')">Edit</button></div></div>'+(o.national_id?'<div style="color:var(--muted);font-size:0.78rem;margin-top:4px">ID: '+esc(o.national_id)+(o.date_of_birth?' | DOB: '+esc(o.date_of_birth):'')+(o.phone?' | Phone: '+esc(o.phone):'')+'</div>':'')+'</div>';}).join(''))+'</div>'
+    +'<div class="card"><div class="card-header"><h3>Documents ('+docs.length+')</h3><button class="btn btn-outline btn-sm" onclick="uploadDocModal(\''+id+'\')">Upload</button></div>'+(docs.length===0?'<p style="color:var(--muted)">No documents</p>':'<table><thead><tr><th>Type</th><th>Side</th><th>Verification</th><th>OCR</th><th>Date</th><th></th></tr></thead><tbody>'+docs.map(function(d){return '<tr><td>'+esc(d.doc_type)+'</td><td>'+esc(d.doc_side||'-')+'</td><td>'+statusBadge(d.verification_status)+'</td><td>'+statusBadge(d.ocr_status)+'</td><td style="font-size:0.78rem;color:var(--muted)">'+fmtDate(d.created_at)+'</td><td><button class="btn btn-outline btn-sm" style="font-size:0.78rem" onclick="viewDocOcr(\''+d.id+'\',\''+m.id+'\')">OCR</button></td></tr>';}).join('')+'</tbody></table>')+'</div>'
+    +'<div class="card"><div class="card-header"><h3>Fingerprint Integration</h3></div><p style="color:var(--muted);font-size:0.85rem;margin-bottom:12px">Embed this snippet on the merchant\'s website to link device fingerprints to this KYC record.</p><div class="code-box"><button onclick="copySnippet(this)">Copy</button><pre style="margin:0;white-space:pre-wrap">'+snippetCode+'</pre></div><p style="color:var(--muted);font-size:0.78rem;margin-top:8px">Merchant ID: <code>'+esc(id)+'</code> &mdash; All device events tagged with this merchant will appear in your fingerprint dashboard.</p></div>'
+    +'<div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-info btn-sm" onclick="screenMerchantById(\''+id+'\')">Run Screening</button><button class="btn btn-outline btn-sm" onclick="autoFillOwner(\''+id+'\')">Auto-fill from OCR</button></div>';
+  }catch(e){c.innerHTML='<p class="error-msg">'+esc(e.message)+'</p>';}
+}
+
+function copySnippet(btn){var pre=btn.parentElement.querySelector('pre');var txt=pre.textContent.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');navigator.clipboard.writeText(txt).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy';},2000);});}
+
+async function changeKyc(id,status){try{toast('Updating KYC status...');await apiCall('PATCH','/v1/merchants/'+id,{kycStatus:status});toast('KYC status updated to '+status);dashData=null;viewMerchant(id);}catch(e){toast(e.message,true);}}
+
+async function screenMerchantById(id){try{toast('Running screening...');await apiCall('POST','/v1/merchants/'+id+'/screen');toast('Screening complete');dashData=null;viewMerchant(id);}catch(e){toast(e.message,true);}}
+async function autoFillOwner(mid){try{var data=await apiCall('GET','/v1/merchants/'+mid);var m=data.merchant;var owners=m&&m.owners||[];if(!owners.length){toast('No owner found',true);return;}toast('Running OCR auto-fill...');var r=await apiCall('POST','/v1/owners/'+owners[0].id+'/auto-fill');toast('Auto-fill done! '+(r.fieldsUpdated||0)+' fields updated');dashData=null;viewMerchant(mid);}catch(e){toast(e.message,true);}}
+
+function addOwnerModal(merchantId){
+  var overlay=document.createElement('div');overlay.className='modal-overlay';overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="modal"><h2>Add Owner</h2>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div class="fg"><label>Full Name (Arabic) *</label><input id="ao_nameAr" dir="rtl"></div>'
+    +'<div class="fg"><label>Full Name (English)</label><input id="ao_nameEn"></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div class="fg"><label>Father\'s Name</label><input id="ao_father" dir="rtl"></div>'
+    +'<div class="fg"><label>Grandfather\'s Name</label><input id="ao_grand" dir="rtl"></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div class="fg"><label>National ID</label><input id="ao_nid"></div>'
+    +'<div class="fg"><label>Passport</label><input id="ao_passport"></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
+    +'<div class="fg"><label>DOB</label><input type="date" id="ao_dob"></div>'
+    +'<div class="fg"><label>Gender</label><select id="ao_gender"><option value="">-</option><option value="male">Male</option><option value="female">Female</option></select></div>'
+    +'<div class="fg"><label>Nationality</label><input id="ao_nation" value="Iraqi"></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div class="fg"><label>Ownership %</label><input type="number" id="ao_pct" value="100" min="0" max="100"></div>'
+    +'<div class="fg"><label>Role</label><select id="ao_role"><option value="owner">Owner</option><option value="manager">Manager</option><option value="partner">Partner</option><option value="signatory">Signatory</option></select></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div class="fg"><label>Phone</label><input id="ao_phone"></div>'
+    +'<div class="fg"><label>Occupation</label><input id="ao_occ"></div></div>'
+    +'<div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-primary btn-sm" onclick="doAddOwner(\''+merchantId+'\')">Add Owner</button><button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button></div></div>';
+  document.body.appendChild(overlay);
+}
+async function doAddOwner(mid){
+  var d={fullNameAr:v('ao_nameAr'),fullNameEn:v('ao_nameEn'),fatherNameAr:v('ao_father'),grandfatherNameAr:v('ao_grand'),nationalId:v('ao_nid'),passportNumber:v('ao_passport'),dateOfBirth:v('ao_dob'),gender:v('ao_gender'),nationality:v('ao_nation'),ownershipPct:parseInt(v('ao_pct'))||100,role:v('ao_role'),phone:v('ao_phone'),occupation:v('ao_occ')};
+  if(!d.fullNameAr){toast('Arabic name is required',true);return;}
+  try{toast('Adding owner...');await apiCall('POST','/v1/merchants/'+mid+'/owners',d);toast('Owner added!');var ov=document.querySelector('.modal-overlay');if(ov)ov.remove();dashData=null;viewMerchant(mid);}catch(e){toast(e.message,true);}
+}
+
+function editOwnerModal(ownerId,merchantId){
+  // Fetch current owner data and show edit form
+  apiCall('GET','/v1/merchants/'+merchantId).then(function(data){
+    var m=data.merchant;var o=(m.owners||[]).find(function(x){return x.id===ownerId;});
+    if(!o){toast('Owner not found',true);return;}
+    var overlay=document.createElement('div');overlay.className='modal-overlay';overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+    overlay.innerHTML='<div class="modal"><h2>Edit Owner</h2>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>Full Name (Arabic)</label><input id="eo_nameAr" dir="rtl" value="'+esc(o.full_name_ar||'')+'"></div>'
+      +'<div class="fg"><label>Full Name (English)</label><input id="eo_nameEn" value="'+esc(o.full_name_en||'')+'"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>Father</label><input id="eo_father" dir="rtl" value="'+esc(o.father_name_ar||'')+'"></div>'
+      +'<div class="fg"><label>Grandfather</label><input id="eo_grand" dir="rtl" value="'+esc(o.grandfather_name_ar||'')+'"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>Family Name</label><input id="eo_family" dir="rtl" value="'+esc(o.family_name_ar||'')+'"></div>'
+      +'<div class="fg"><label>Mother</label><input id="eo_mother" dir="rtl" value="'+esc(o.mother_name_ar||'')+'"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>National ID</label><input id="eo_nid" value="'+esc(o.national_id||'')+'"></div>'
+      +'<div class="fg"><label>Passport</label><input id="eo_passport" value="'+esc(o.passport_number||'')+'"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>DOB</label><input type="date" id="eo_dob" value="'+esc(o.date_of_birth||'')+'"></div>'
+      +'<div class="fg"><label>Gender</label><select id="eo_gender"><option value="">-</option><option value="male"'+(o.gender==='male'?' selected':'')+'>Male</option><option value="female"'+(o.gender==='female'?' selected':'')+'>Female</option></select></div>'
+      +'<div class="fg"><label>Nationality</label><input id="eo_nation" value="'+esc(o.nationality||'Iraqi')+'"></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>Ownership %</label><input type="number" id="eo_pct" value="'+(o.ownership_pct||100)+'" min="0" max="100"></div>'
+      +'<div class="fg"><label>Role</label><select id="eo_role"><option value="owner"'+(o.role==='owner'?' selected':'')+'>Owner</option><option value="manager"'+(o.role==='manager'?' selected':'')+'>Manager</option><option value="partner"'+(o.role==='partner'?' selected':'')+'>Partner</option><option value="signatory"'+(o.role==='signatory'?' selected':'')+'>Signatory</option></select></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +'<div class="fg"><label>Phone</label><input id="eo_phone" value="'+esc(o.phone||'')+'"></div>'
+      +'<div class="fg"><label>Occupation</label><input id="eo_occ" value="'+esc(o.occupation||'')+'"></div></div>'
+      +'<div class="fg"><label>Source of Funds</label><input id="eo_funds" value="'+esc(o.source_of_funds||'')+'"></div>'
+      +'<div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-primary btn-sm" onclick="doEditOwner(\''+ownerId+'\',\''+merchantId+'\')">Save Changes</button><button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button></div></div>';
+    document.body.appendChild(overlay);
+  }).catch(function(e){toast(e.message,true);});
+}
+async function doEditOwner(oid,mid){
+  var d={fullNameAr:v('eo_nameAr'),fullNameEn:v('eo_nameEn'),fatherNameAr:v('eo_father'),grandfatherNameAr:v('eo_grand'),familyNameAr:v('eo_family'),motherNameAr:v('eo_mother'),nationalId:v('eo_nid'),passportNumber:v('eo_passport'),dateOfBirth:v('eo_dob'),gender:v('eo_gender'),nationality:v('eo_nation'),ownershipPct:parseInt(v('eo_pct'))||100,role:v('eo_role'),phone:v('eo_phone'),occupation:v('eo_occ'),sourceOfFunds:v('eo_funds')};
+  try{toast('Saving...');await apiCall('PATCH','/v1/owners/'+oid,d);toast('Owner updated!');var ov=document.querySelector('.modal-overlay');if(ov)ov.remove();dashData=null;viewMerchant(mid);}catch(e){toast(e.message,true);}
+}
+
+function uploadDocModal(merchantId){
+  var overlay=document.createElement('div');overlay.className='modal-overlay';overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+  overlay.innerHTML='<div class="modal"><h2>Upload Document</h2><div class="fg"><label>Document Type</label><select id="modalDocType"><option value="national_id">National ID</option><option value="passport">Passport</option><option value="resident_id">Resident ID</option><option value="business_license">Business License</option></select></div><div class="fg"><label>Side</label><select id="modalDocSide"><option value="front">Front</option><option value="back">Back</option></select></div><div class="fg"><label>File</label><input type="file" id="modalDocFile" accept="image/*,.pdf"></div><div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-primary btn-sm" onclick="doModalUpload(\''+merchantId+'\')">Upload &amp; OCR</button><button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button></div></div>';
+  document.body.appendChild(overlay);
+}
+async function doModalUpload(mid){
+  var t=document.getElementById('modalDocType').value,s=document.getElementById('modalDocSide').value,f=document.getElementById('modalDocFile').files[0];
+  if(!f){toast('Choose a file',true);return;}
+  var fd=new FormData();fd.append('file',f);fd.append('docType',t);fd.append('docSide',s);
+  try{toast('Uploading...');await apiUpload('/v1/merchants/'+mid+'/documents',fd);toast('Uploaded!');var ov=document.querySelector('.modal-overlay');if(ov)ov.remove();dashData=null;viewMerchant(mid);}catch(e){toast(e.message,true);}
+}
+
+// ---- ONBOARDING (new flow: Upload -> OCR -> Fill -> Save -> Link) ----
+var curStep=1;
+function resetOnboarding(){
+  curStep=1;onbMerchant=null;pendingFiles={};ocrResults={};updateStepBar();
+  document.querySelectorAll('[id^="onb-step"]').forEach(function(el){el.classList.add('hidden');});
+  document.getElementById('onb-step1').classList.remove('hidden');
+  var ids=['ow_nameAr','ow_nameEn','ow_father','ow_grand','ow_family','ow_mother','ow_dob','ow_gender','ow_pob','ow_nid','ow_passport','ow_phone','ow_occ','ow_funds','ow_pct','ow_role','ob_legalAr','ob_legalEn','ob_trade','ob_regNo','ob_taxId','ob_gov','ob_city','ob_addr','ob_phone','ob_email'];
+  ids.forEach(function(id){var el=document.getElementById(id);if(!el)return;if(el.tagName==='SELECT')el.selectedIndex=0;else if(id==='ow_pct')el.value='100';else if(id==='ow_nation')el.value='Iraqi';else el.value='';el.classList.remove('ocr-filled','field-missing');});
+  ['preview_nid_front','preview_nid_back','preview_passport','preview_business_license'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML='';});
+  document.getElementById('ocrStatusArea').innerHTML='';
+}
+
+function onbGo(step){
+  if(step===4)buildReview();
+  curStep=step;updateStepBar();
+  document.querySelectorAll('[id^="onb-step"]').forEach(function(el){el.classList.add('hidden');});
+  document.getElementById('onb-step'+step).classList.remove('hidden');
+}
+function updateStepBar(){
+  document.querySelectorAll('.step-dot').forEach(function(el){var s=parseInt(el.dataset.s);el.classList.remove('active','done');if(s===curStep)el.classList.add('active');else if(s<curStep)el.classList.add('done');});
+  document.querySelectorAll('.step-line').forEach(function(el){var s=parseInt(el.dataset.sl);if(s<curStep)el.classList.add('done');else el.classList.remove('done');});
+}
+
+// STEP 1->2: Upload files, create temp merchant, run OCR, then fill form
+async function runOcrAndProceed(){
+  var fileKeys=Object.keys(pendingFiles);
+  if(!fileKeys.length){toast('Upload at least one document (National ID front recommended)',true);return;}
+  var btn=document.querySelector('#onb-step1 .btn-primary');btn.disabled=true;btn.textContent='Uploading & running OCR...';
+  try{
+    // Create a minimal merchant first so we can upload docs to it
+    var res=await apiCall('POST','/v1/merchants',{legalNameAr:'_pending_kyc',owners:[{fullNameAr:'_pending',role:'owner',ownershipPct:100}]});
+    onbMerchant=res.merchant;var mid=onbMerchant.id;
+    toast('Processing documents...');
+    // Upload each file
+    for(var key in pendingFiles){
+      if(!pendingFiles.hasOwnProperty(key))continue;
+      var file=pendingFiles[key];var fd=new FormData();fd.append('file',file);
+      if(key==='nid_front'){fd.append('docType','national_id');fd.append('docSide','front');}
+      else if(key==='nid_back'){fd.append('docType','national_id');fd.append('docSide','back');}
+      else if(key==='passport'){fd.append('docType','passport');fd.append('docSide','front');}
+      else if(key==='business_license'){fd.append('docType','business_license');fd.append('docSide','front');}
+      try{var docRes=await apiUpload('/v1/merchants/'+mid+'/documents',fd);if(docRes.document&&docRes.document.ocr_result)ocrResults[key]=docRes.document.ocr_result;}catch(e2){toast('Upload error ('+key+'): '+e2.message,true);}
+    }
+    // OCR runs in background on the server — poll until all docs have OCR results
+    toast('Waiting for OCR to complete...');
+    var maxPolls=20,pollInterval=3000,pollCount=0,allDone=false;
+    while(pollCount<maxPolls&&!allDone){
+      await new Promise(function(r){setTimeout(r,pollInterval);});
+      pollCount++;
+      try{
+        var docsData=await apiCall('GET','/v1/merchants/'+mid+'/documents');
+        var docs=docsData.documents||[];
+        allDone=docs.length>0&&docs.every(function(d){return d.ocr_status==='completed'||d.ocr_status==='failed';});
+        docs.forEach(function(d){
+          if(d.ocr_result&&typeof d.ocr_result==='object'){
+            var k=d.doc_type==='national_id'?(d.doc_side==='back'?'nid_back':'nid_front'):d.doc_type;
+            ocrResults[k]=d.ocr_result;
+          }
+        });
+        if(!allDone){var pending=docs.filter(function(d){return d.ocr_status!=='completed'&&d.ocr_status!=='failed';}).length;toast('OCR processing... ('+pending+' remaining)');}
+      }catch(e3){break;}
+    }
+    if(!allDone)toast('Some documents may still be processing. Showing available results.');
+    // Fill form from OCR
+    fillFromOcr();
+    onbGo(2);
+  }catch(e){toast(e.message,true);}
+  finally{btn.disabled=false;btn.textContent='Upload & Run OCR \u2192';}
+}
+
+function fillFromOcr(){
+  var statusHtml='';var filled=0,total=0;
+  // Helper: extract plain value from OCR field (handles {value,confidence} objects and plain strings)
+  function gv(f){if(!f)return null;if(typeof f==='object'&&f.value)return f.value;if(typeof f==='string')return f;return null;}
+  // Map OCR extraction fields to form fields
+  // OCR returns: {success, extraction: {doc_type, first_name_ar:{value,confidence}, ...}, raw_text}
+  var mapping=[
+    {keys:['full_name_ar','first_name_ar','name_ar'],field:'ow_nameAr'},
+    {keys:['full_name_en','name_en','first_name_en'],field:'ow_nameEn'},
+    {keys:['father_name_ar','father_name'],field:'ow_father'},
+    {keys:['grandfather_name_ar','grandfather_name'],field:'ow_grand'},
+    {keys:['surname_ar','family_name','family_name_ar'],field:'ow_family'},
+    {keys:['mother_name_ar','mother_name'],field:'ow_mother'},
+    {keys:['date_of_birth','dob','birth_date'],field:'ow_dob'},
+    {keys:['gender','sex'],field:'ow_gender'},
+    {keys:['nationality'],field:'ow_nation'},
+    {keys:['national_id_number','national_id','civil_status_number'],field:'ow_nid'},
+    {keys:['passport_number'],field:'ow_passport'},
+    {keys:['place_of_birth','birth_place'],field:'ow_pob'},
+    {keys:['phone','mobile'],field:'ow_phone'},
+    {keys:['business_name_ar','business_name','legal_name','company_name'],field:'ob_legalAr'},
+    {keys:['business_name_en'],field:'ob_legalEn'},
+    {keys:['registration_number','license_number'],field:'ob_regNo'},
+    {keys:['address','full_address'],field:'ob_addr'},
+    {keys:['business_type'],field:'ob_bizType'}
+  ];
+  // Merge all OCR extractions into flat {key: plainValue} map
+  var merged={};var rawFieldCount=0;
+  Object.keys(ocrResults).forEach(function(k){
+    var r=ocrResults[k];if(!r||typeof r!=='object')return;
+    // Navigate into .extraction if present (API stores {success, extraction:{...}, raw_text})
+    var ext=r.extraction||r;
+    if(!ext||typeof ext!=='object')return;
+    Object.keys(ext).forEach(function(fk){
+      if(fk==='doc_type'||fk==='doc_side'||fk==='raw_text'||fk==='raw'||fk==='success'||fk==='model'||fk==='processed_at'||fk==='error')return;
+      var val=gv(ext[fk]);
+      if(val){merged[fk]=val;rawFieldCount++;}
+    });
+  });
+  statusHtml='<div style="padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px"><strong>OCR Results:</strong> Found '+rawFieldCount+' fields from '+Object.keys(ocrResults).length+' document(s)</div>';
+  mapping.forEach(function(m){
+    var val=null;
+    for(var i=0;i<m.keys.length;i++){if(merged[m.keys[i]]){val=merged[m.keys[i]];break;}}
+    var el=document.getElementById(m.field);if(!el)return;
+    // Only count and highlight owner/person fields (ow_*) in Step 2 as OCR targets.
+    // Business fields (ob_*) are manual-entry on Step 3 — don't mark them missing.
+    var isOcrTarget=m.field.indexOf('ow_')===0;
+    if(val){
+      if(m.field==='ow_gender'){var lv=String(val).toLowerCase();if(lv==='male'||lv==='m'||lv==='ذكر')el.value='male';else if(lv==='female'||lv==='f'||lv==='انثى'||lv==='أنثى')el.value='female';}
+      else{el.value=String(val);}
+      el.classList.add('ocr-filled');el.classList.remove('field-missing');if(isOcrTarget)filled++;
+    }else if(isOcrTarget){el.classList.add('field-missing');el.classList.remove('ocr-filled');}
+    if(isOcrTarget)total++;
+  });
+  statusHtml+='<div style="padding:10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;font-size:0.85rem"><strong>'+filled+'/'+total+'</strong> fields auto-filled from OCR. Please review and complete the <span style="background:#fffbeb;padding:1px 6px;border-radius:4px">yellow</span> fields manually.</div>';
+  document.getElementById('ocrStatusArea').innerHTML=statusHtml;
+}
+
+function buildReview(){
+  var d=getOnbData(),fc=Object.keys(pendingFiles).length;
+  document.getElementById('reviewSummary').innerHTML=
+    '<div class="card" style="background:var(--surface2)"><h4 style="margin-bottom:10px">Owner</h4><p><strong>Name:</strong> '+esc(d.owner.fullNameAr)+(d.owner.fullNameEn?' ('+esc(d.owner.fullNameEn)+')':'')+'</p>'+(d.owner.nationalId?'<p><strong>National ID:</strong> '+esc(d.owner.nationalId)+'</p>':'')+(d.owner.dateOfBirth?'<p><strong>DOB:</strong> '+esc(d.owner.dateOfBirth)+'</p>':'')+'<p><strong>Role:</strong> '+esc(d.owner.role)+' - '+d.owner.ownershipPct+'%</p></div>'
+    +'<div class="card" style="background:var(--surface2);margin-top:10px"><h4 style="margin-bottom:10px">Business</h4><p><strong>Legal Name:</strong> '+esc(d.legalNameAr)+(d.legalNameEn?' ('+esc(d.legalNameEn)+')':'')+'</p>'+(d.tradeName?'<p><strong>Trade Name:</strong> '+esc(d.tradeName)+'</p>':'')+(d.businessType?'<p><strong>Type:</strong> '+esc(d.businessType)+'</p>':'')+(d.governorate?'<p><strong>Location:</strong> '+esc(d.governorate)+', '+esc(d.city||'')+'</p>':'')+'</div>'
+    +'<div class="card" style="background:var(--surface2);margin-top:10px"><h4>Documents</h4><p>'+fc+' document(s) uploaded &amp; OCR processed</p></div>'
+    +'<div class="card" style="background:#ecfdf5;border-color:#a7f3d0;margin-top:10px"><h4>Fingerprint Linking</h4><p style="font-size:0.85rem">After saving, you will receive a device tracking snippet to embed on the merchant\'s website. All device fingerprints will be linked back to this KYC record.</p></div>';
+}
+
+function getOnbData(){
+  return{legalNameAr:v('ob_legalAr'),legalNameEn:v('ob_legalEn'),tradeName:v('ob_trade'),registrationNumber:v('ob_regNo'),taxId:v('ob_taxId'),businessType:v('ob_bizType'),governorate:v('ob_gov'),city:v('ob_city'),address:v('ob_addr'),phone:v('ob_phone'),email:v('ob_email'),owner:{fullNameAr:v('ow_nameAr'),fullNameEn:v('ow_nameEn'),fatherNameAr:v('ow_father'),grandfatherNameAr:v('ow_grand'),familyNameAr:v('ow_family'),motherNameAr:v('ow_mother'),dateOfBirth:v('ow_dob'),placeOfBirth:v('ow_pob'),gender:v('ow_gender'),nationality:v('ow_nation'),nationalId:v('ow_nid'),passportNumber:v('ow_passport'),phone:v('ow_phone'),occupation:v('ow_occ'),sourceOfFunds:v('ow_funds'),ownershipPct:parseInt(v('ow_pct'))||100,role:v('ow_role')}};
+}
+function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
+
+async function submitOnboarding(){
+  var btn=document.getElementById('submitOnbBtn');btn.disabled=true;btn.textContent='Saving...';
+  try{
+    var d=getOnbData();
+    if(!d.owner.fullNameAr||d.owner.fullNameAr==='_pending'){toast('Owner name is required',true);btn.disabled=false;btn.textContent='\u2713 Save Merchant & Link';return;}
+    var mid;
+    if(onbMerchant&&onbMerchant.id){
+      mid=onbMerchant.id;
+      // Update merchant fields
+      var merchUpdate={legalNameAr:d.legalNameAr,legalNameEn:d.legalNameEn,tradeName:d.tradeName,registrationNumber:d.registrationNumber,taxId:d.taxId,businessType:d.businessType,address:d.address,city:d.city,governorate:d.governorate,phone:d.phone,email:d.email};
+      try{await apiCall('PATCH','/v1/merchants/'+mid,merchUpdate);}catch(e2){}
+      // Update or add owner
+      var existingOwners=(onbMerchant.owners||[]);
+      if(existingOwners.length>0){
+        // Update the existing (placeholder) owner with real data
+        try{await apiCall('PATCH','/v1/owners/'+existingOwners[0].id,d.owner);}catch(e3){
+          // If PATCH fails, try adding as new owner
+          try{await apiCall('POST','/v1/merchants/'+mid+'/owners',d.owner);}catch(e4){}
+        }
+      }else{
+        // No owner yet — add one
+        try{await apiCall('POST','/v1/merchants/'+mid+'/owners',d.owner);}catch(e3){}
+      }
+    }else{
+      // No temp merchant — create fresh with owner
+      var payload=Object.assign({},d);payload.owners=[d.owner];delete payload.owner;
+      var res=await apiCall('POST','/v1/merchants',payload);onbMerchant=res.merchant;mid=onbMerchant.id;
+    }
+    // Run screening
+    try{await apiCall('POST','/v1/merchants/'+mid+'/screen');}catch(e3){}
+    toast('Merchant saved! Screening running...');
+    dashData=null;
+    // Show fingerprint link section
+    showFingerprintLink(mid);
+  }catch(e){toast(e.message,true);}
+  finally{btn.disabled=false;btn.textContent='\u2713 Save Merchant & Link';}
+}
+
+function showFingerprintLink(mid){
+  var shortId=mid.substring(0,8);
+  var snippet='<script src="https://deviceid-cdn.pages.dev/deviceid.min.js"><\/script>\n<script>\nconst did = new DeviceID({\n  apiKey: \''+esc(session.apiKey||'')+'\',\n  apiEndpoint: \''+API+'/v1/fingerprint\'\n});\n\n// Identify device and link to this merchant\ndid.identify({ linkedTag: \'merchant_'+esc(shortId)+'\' })\n  .then(device => console.log(\'Device:\', device.visitorId));\n<\/script>';
+
+  document.getElementById('fingerprintLinkSection').innerHTML=
+    '<div class="card"><div class="card-header"><h3>Device Fingerprint Integration</h3></div>'
+    +'<p style="color:var(--muted);font-size:0.85rem;margin-bottom:14px">Embed this snippet on the merchant\'s website or app. All device fingerprints will be tagged with this merchant\'s ID and appear in your device intelligence dashboard.</p>'
+    +'<div class="code-box"><button onclick="copySnippet(this)">Copy</button><pre style="margin:0;white-space:pre-wrap">'+esc(snippet)+'</pre></div>'
+    +'<div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +'<div style="padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="font-weight:600;font-size:0.85rem">Merchant ID</div><div style="color:var(--muted);font-size:0.8rem;word-break:break-all">'+esc(mid)+'</div></div>'
+    +'<div style="padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px"><div style="font-weight:600;font-size:0.85rem">Linked Tag</div><div style="color:var(--muted);font-size:0.8rem">merchant_'+esc(shortId)+'</div></div>'
+    +'</div>'
+    +'<p style="color:var(--muted);font-size:0.78rem;margin-top:10px">When the SDK runs on the merchant\'s site, each visitor gets a unique <code>visitorId</code>. You can view all linked devices, risk scores, and cross-device activity in the Dashboard.</p>'
+    +'</div>';
+  // Show step 5
+  document.querySelectorAll('[id^="onb-step"]').forEach(function(el){el.classList.add('hidden');});
+  document.getElementById('onb-step5').classList.remove('hidden');
+  curStep=5;
+}
+
+// ---- File upload ----
+function onFileSelect(inp,key){if(inp.files[0]){pendingFiles[key]=inp.files[0];showPreview(key,inp.files[0]);}}
+function showPreview(key,file){
+  var c=document.getElementById('preview_'+key);if(!c)return;
+  var url=URL.createObjectURL(file);
+  c.innerHTML='<div class="file-preview"><img src="'+url+'" onerror="this.style.display=\'none\'"><div><div style="font-weight:600;font-size:0.84rem">'+esc(file.name)+'</div><div style="color:var(--muted);font-size:0.73rem">'+Math.round(file.size/1024)+' KB</div></div><button class="btn btn-outline btn-sm" style="margin-left:auto;font-size:0.75rem" onclick="removeFile(\''+key+'\')">Remove</button></div>';
+}
+function removeFile(key){delete pendingFiles[key];var c=document.getElementById('preview_'+key);if(c)c.innerHTML='';}
+
+// ---- ALERTS ----
+async function loadAlerts(){
+  var c=document.getElementById('alertsList');c.innerHTML='<div class="loading-full"><div class="spinner"></div></div>';
+  try{var d=await apiCall('GET','/v1/compliance/alerts');allAlerts=d.alerts||[];filterAlerts('open');}catch(e){c.innerHTML='<p class="error-msg">'+esc(e.message)+'</p>';}
+}
+function filterAlerts(f){
+  document.querySelectorAll('#alertTabs .tab').forEach(function(t){t.classList.remove('active');});
+  if(event&&event.target&&event.target.classList)event.target.classList.add('active');
+  var list=allAlerts;
+  if(f==='open')list=allAlerts.filter(function(a){return a.status==='open'||!a.status;});
+  else if(f==='critical')list=allAlerts.filter(function(a){return a.severity==='critical';});
+  else if(f==='resolved')list=allAlerts.filter(function(a){return a.status==='resolved'||a.status==='false_positive';});
+  var c=document.getElementById('alertsList');
+  if(!list.length){c.innerHTML='<p style="color:var(--muted);padding:16px">No alerts</p>';return;}
+  c.innerHTML=list.map(function(a){return '<div class="alert-item"><div class="alert-dot '+(a.severity||'medium')+'"></div><div style="flex:1"><div style="font-weight:600;font-size:0.88rem">'+esc(a.alert_type||'Alert')+'</div><div style="color:var(--muted);font-size:0.82rem">'+esc(a.legal_name_ar||a.owner_name_ar||'')+'</div><div style="color:var(--muted);font-size:0.78rem;margin-top:3px">'+esc(parseDetails(a.details))+'</div></div><div style="text-align:right"><div style="color:var(--muted);font-size:0.73rem">'+timeAgo(a.created_at)+'</div>'+((a.status==='open'||!a.status)?'<div style="margin-top:6px;display:flex;gap:4px"><button class="btn btn-outline btn-sm" style="font-size:0.7rem" onclick="resolveAlert(\''+a.id+'\',\'resolved\')">Resolve</button><button class="btn btn-outline btn-sm" style="font-size:0.7rem" onclick="resolveAlert(\''+a.id+'\',\'false_positive\')">False +</button></div>':'<div class="badge badge-approved" style="margin-top:6px">'+esc(a.status)+'</div>')+'</div></div>';}).join('');
+}
+async function resolveAlert(id,st){try{await apiCall('PATCH','/v1/compliance/alerts/'+id,{status:st});toast('Updated');loadAlerts();}catch(e){toast(e.message,true);}}
+
+// ---- SCREENING ----
+async function manualScreen(){
+  var name=document.getElementById('screenName').value.trim(),type=document.getElementById('screenType').value;
+  if(!name){toast('Enter a name',true);return;}
+  var c=document.getElementById('screenResults');c.innerHTML='<div class="loading-full"><div class="spinner"></div> Screening...</div>';
+  try{
+    var d=await apiCall('POST','/v1/screening/check',{name:name,entityType:type});
+    if(!d.sanctions||!d.sanctions.length){c.innerHTML='<div style="padding:18px;background:#d1fae5;border:1px solid #a7f3d0;border-radius:8px;text-align:center"><strong style="color:#065f46">&#10003; No Matches Found</strong><br><span style="color:var(--muted);font-size:0.85rem">'+esc(name)+' - Clear</span></div>';}
+    else{c.innerHTML='<div style="padding:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;margin-bottom:10px"><strong style="color:#991b1b">Warning: '+d.sanctions.length+' match(es)</strong></div>'+d.sanctions.map(function(s){return '<div style="padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px"><div style="font-weight:600">'+esc(s.matchedName||s.name||'-')+'</div><div style="color:var(--muted);font-size:0.82rem">'+esc(s.listName||s.source||'-')+' &mdash; '+((s.score||s.matchScore||0)*100).toFixed(0)+'%</div></div>';}).join('');}
+  }catch(e){c.innerHTML='<p class="error-msg">'+esc(e.message)+'</p>';}
+}
+async function batchScreen(){try{toast('Starting batch screening...');var d=await apiCall('POST','/v1/compliance/screen-all');toast(d.message||'Done');}catch(e){toast(e.message,true);}}
+
+// ---- ACTIVITY ----
+async function loadActivity(){
+  var c=document.getElementById('activityList');c.innerHTML='<div class="loading-full"><div class="spinner"></div></div>';
+  try{
+    var d=await apiCall('GET','/v1/portal/activity');var items=d.activity||[];
+    if(!items.length){c.innerHTML='<p style="color:var(--muted);padding:16px">No activity</p>';return;}
+    c.innerHTML=items.map(function(a){return '<div style="display:flex;gap:12px;padding:12px;border-bottom:1px solid var(--border)"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:6px;flex-shrink:0"></div><div style="flex:1"><div style="font-weight:600;font-size:0.88rem">'+esc(actionLabel(a.action))+'</div>'+(a.merchant_name?'<div style="color:var(--muted);font-size:0.82rem">'+esc(a.merchant_name)+'</div>':'')+'<div style="color:var(--muted);font-size:0.78rem">'+esc(parseDetails(a.details))+'</div></div><div style="color:var(--muted);font-size:0.73rem;white-space:nowrap">'+timeAgo(a.created_at)+'</div></div>';}).join('');
+  }catch(e){c.innerHTML='<p class="error-msg">'+esc(e.message)+'</p>';}
+}
+
+// ---- OCR Modal ----
+async function viewDocOcr(docId,merchantId){
+  try{
+    var data=await apiCall('GET','/v1/merchants/'+merchantId+'/documents');
+    var doc=(data.documents||[]).find(function(d){return d.id===docId;});
+    if(!doc){toast('Not found',true);return;}
+    var ocrHtml='<p style="color:var(--muted)">No OCR results</p>';
+    if(doc.ocr_result&&typeof doc.ocr_result==='object'){
+      var fields=Object.entries(doc.ocr_result).filter(function(e){return e[1]&&e[0]!=='raw';});
+      if(fields.length){ocrHtml='<div class="ocr-result">'+fields.map(function(e){return '<div class="ocr-field"><span class="ocr-key">'+esc(e[0])+'</span><span class="ocr-val">'+esc(String(e[1]))+'</span></div>';}).join('')+'</div>';}
+    }else if(doc.ocr_result){ocrHtml='<div class="ocr-result"><pre style="white-space:pre-wrap;font-size:0.82rem">'+esc(typeof doc.ocr_result==='string'?doc.ocr_result:JSON.stringify(doc.ocr_result,null,2))+'</pre></div>';}
+    var overlay=document.createElement('div');overlay.className='modal-overlay';overlay.onclick=function(ev){if(ev.target===overlay)overlay.remove();};
+    overlay.innerHTML='<div class="modal"><h2>'+esc(doc.doc_type)+' ('+esc(doc.doc_side||'front')+')</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px"><div><strong>Verification:</strong> '+statusBadge(doc.verification_status)+'</div><div><strong>OCR:</strong> '+statusBadge(doc.ocr_status)+'</div></div><h3 style="margin-bottom:10px;font-size:0.95rem">Extracted Data</h3>'+ocrHtml+'<div style="display:flex;gap:8px;margin-top:18px"><button class="btn btn-info btn-sm" onclick="retryOcr(\''+docId+'\');this.closest(\'.modal-overlay\').remove()">Retry OCR</button><button class="btn btn-outline btn-sm" onclick="this.closest(\'.modal-overlay\').remove()">Close</button></div></div>';
+    document.body.appendChild(overlay);
+  }catch(e){toast(e.message,true);}
+}
+async function retryOcr(docId){try{toast('Re-running OCR...');await apiCall('POST','/v1/documents/'+docId+'/retry-ocr');toast('Done');dashData=null;}catch(e){toast(e.message,true);}}
+
+// ---- HELPERS ----
+function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}
+function kycBadge(s){var m={pending:['Pending','badge-pending'],under_review:['Under Review','badge-review'],approved:['Approved','badge-approved'],rejected:['Rejected','badge-rejected']};var r=m[s]||[s||'-','badge-pending'];return '<span class="badge '+r[1]+'">'+r[0]+'</span>';}
+function screenBadge(s){var m={clear:['Clear','badge-clear'],hit:['Hit','badge-hit'],flagged:['Flagged','badge-hit'],pending:['Pending','badge-pending']};var r=m[s]||[s||'-','badge-pending'];return '<span class="badge '+r[1]+'">'+r[0]+'</span>';}
+function riskBadge(s){var m={high:['High','badge-rejected'],medium:['Medium','badge-review'],low:['Low','badge-approved']};var r=m[s]||[s||'-','badge-pending'];return '<span class="badge '+r[1]+'">'+r[0]+'</span>';}
+function statusBadge(s){var m={verified:['Verified','badge-approved'],completed:['Done','badge-approved'],pending:['Pending','badge-pending'],failed:['Failed','badge-rejected'],rejected:['Rejected','badge-rejected']};var r=m[s]||[s||'-','badge-pending'];return '<span class="badge '+r[1]+'">'+r[0]+'</span>';}
+function fmtDate(d){if(!d)return'-';try{return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch(e){return d;}}
+function timeAgo(d){if(!d)return'';var diff=Date.now()-new Date(d).getTime();var m=Math.floor(diff/60000);if(m<1)return'just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';}
+function parseDetails(d){if(!d)return'';if(typeof d==='string'){try{d=JSON.parse(d);}catch(e){return d;}}if(typeof d==='object')return Object.entries(d).filter(function(e){return e[1]&&typeof e[1]!=='object';}).map(function(e){return e[0]+': '+e[1];}).join(' | ');return String(d);}
+function actionLabel(a){var m={merchant_created:'Merchant Created',document_uploaded:'Document Uploaded',document_verified:'Document Verified',screening_completed:'Screening Complete',alert_resolved:'Alert Resolved',owner_updated:'Owner Updated',batch_screening_started:'Batch Screening',batch_screening_completed:'Batch Done',database_reset:'DB Reset',kyc_submitted:'KYC Submitted'};return m[a]||a||'Activity';}
+function toast(msg,err){var c=document.getElementById('toastContainer');var el=document.createElement('div');el.className='toast'+(err?' error':'');el.textContent=msg;c.appendChild(el);setTimeout(function(){el.remove();},4000);}
+tryRestore();
+</script>
+</body>
+</html>
