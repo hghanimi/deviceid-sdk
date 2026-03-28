@@ -256,6 +256,15 @@ app.use('*', async (c, next) => {
       CREATE INDEX IF NOT EXISTS idx_fingerprints_ip_recent ON fingerprints(ip_address, api_key_id, last_seen DESC);
     `);
   } catch (e) { /* tables already exist or non-fatal */ }
+  // Ensure device_links unique index and nullable evidence column
+  try {
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS device_links_pair_idx ON device_links (visitor_id_a, visitor_id_b);
+    `);
+  } catch (e) { /* index already exists */ }
+  try {
+    await client.query(`ALTER TABLE device_links ALTER COLUMN evidence DROP NOT NULL`);
+  } catch (e) { /* column already nullable or non-fatal */ }
   // Auto-migrate: merchant KYC / compliance tables
   try {
     await client.query(`
@@ -328,19 +337,6 @@ app.use('*', async (c, next) => {
         resolved BOOLEAN DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
-      CREATE TABLE IF NOT EXISTS screening_results (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
-        owner_id UUID REFERENCES merchant_owners(id) ON DELETE CASCADE,
-        entity_name TEXT NOT NULL,
-        matched_name TEXT,
-        match_score DECIMAL(7,4),
-        list_source TEXT,
-        entity_id TEXT,
-        programs TEXT[],
-        details JSONB DEFAULT '{}'::jsonb,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      );
       CREATE INDEX IF NOT EXISTS idx_merchants_api_key ON merchants(api_key_id);
       CREATE INDEX IF NOT EXISTS idx_merchants_kyc ON merchants(kyc_status);
       CREATE INDEX IF NOT EXISTS idx_merchant_owners_merchant ON merchant_owners(merchant_id);
@@ -398,7 +394,7 @@ app.use('/v1/*', async (c, next) => {
   }
 });
 
-app.get('/health', (c) => c.json({ status: 'ok', version: '2.0.0', edge: true }));
+app.get('/health', (c) => c.json({ status: 'ok', version: '3.1.0', edge: true }));
 
 app.get('/stats', async (c) => {
   const apiKey = c.req.header('x-api-key');
@@ -432,7 +428,8 @@ app.get('/stats', async (c) => {
       })),
     });
   } catch (err: any) {
-    return c.json({ error: 'Stats query failed', details: err.message }, 500);
+    console.error('Stats query error:', err);
+    return c.json({ error: 'Stats query failed' }, 500);
   }
 });
 
@@ -751,7 +748,7 @@ app.get('/v1/visitor/:id', async (c) => {
       })),
     });
   } catch (err: any) {
-    return c.json({ error: 'Visitor query failed', details: err.message }, 500);
+    return c.json({ error: 'Visitor query failed' }, 500);
   }
 });
 
@@ -1111,12 +1108,6 @@ app.post('/v1/fingerprint', async (c) => {
       if (vidA === vidB) return;
       const [a, b] = [vidA, vidB].sort(); // canonical order
       try {
-        // Try to add unique index if missing (idempotent)
-        await db.query(`
-          CREATE UNIQUE INDEX IF NOT EXISTS device_links_pair_idx ON device_links (visitor_id_a, visitor_id_b)
-        `).catch(() => {});
-        // Try to make evidence nullable if it isn't
-        await db.query(`ALTER TABLE device_links ALTER COLUMN evidence DROP NOT NULL`).catch(() => {});
         await db.query(
           `INSERT INTO device_links (visitor_id_a, visitor_id_b, link_type, confidence, api_key_id, evidence)
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -1388,6 +1379,19 @@ app.post('/v1/fingerprint', async (c) => {
       }
     }
 
+    // ─── Fetch first/last seen timestamps for this visitor ───
+    let firstSeenAt: string | null = null;
+    let lastSeenAt: string | null = null;
+    try {
+      const seenQ = await db.query(
+        `SELECT MIN(first_seen) AS first_seen, MAX(last_seen) AS last_seen
+         FROM fingerprints WHERE visitor_id = $1 AND api_key_id = $2`,
+        [visitorId, apiKeyId]
+      );
+      firstSeenAt = seenQ.rows[0]?.first_seen || null;
+      lastSeenAt = seenQ.rows[0]?.last_seen || null;
+    } catch (e) { /* non-fatal */ }
+
     // ─── Linked devices (fetch all links for this visitor + transitive) ───
     let linkedResult = { rows: [] as any[] };
     try {
@@ -1631,8 +1635,8 @@ app.post('/v1/fingerprint', async (c) => {
       matchedSignals: matchedSignals.length > 0 ? matchedSignals : undefined,
       visitorFound: !isNew,
       visitorType,
-      firstSeenAt: null, // populated from DB on return visits
-      lastSeenAt: null,
+      firstSeenAt,
+      lastSeenAt,
       browserDetails: {
         browserName,
         browserMajorVersion,
@@ -1662,7 +1666,7 @@ app.post('/v1/fingerprint', async (c) => {
             originTimezone: browserTimezone || null,
             originCountry: cfData.country || 'unknown',
             methods: {
-              timezoneMismatch: vpnScore >= 3 && ipOffsetMin !== null,
+              timezoneMismatch: ipOffsetMin !== null && browserOffsetMin !== null && Math.abs(ipOffsetMin - browserOffsetMin) > 120,
               publicVPN: isVpnAsn,
               osMismatch,
               relay: false,
@@ -1810,7 +1814,7 @@ app.post('/v1/fingerprint', async (c) => {
     });
   } catch (err: any) {
     console.error('Fingerprint error:', err);
-    return c.json({ error: 'Failed to process fingerprint', details: err.message }, 500);
+    return c.json({ error: 'Failed to process fingerprint' }, 500);
   }
 });
 
@@ -1890,7 +1894,7 @@ app.post('/v1/merchants', async (c) => {
     }, 201);
   } catch (err: any) {
     console.error('Create merchant error:', err);
-    return c.json({ error: 'Failed to create merchant', details: err.message }, 500);
+    return c.json({ error: 'Failed to create merchant' }, 500);
   }
 });
 
@@ -1924,7 +1928,7 @@ app.get('/v1/merchants', async (c) => {
     return c.json({ merchants: result.rows, total: result.rows.length });
   } catch (err: any) {
     console.error('List merchants error:', err);
-    return c.json({ error: 'Failed to list merchants', details: err.message }, 500);
+    return c.json({ error: 'Failed to list merchants' }, 500);
   }
 });
 
@@ -1960,7 +1964,7 @@ app.get('/v1/merchants/:id', async (c) => {
     });
   } catch (err: any) {
     console.error('Get merchant error:', err);
-    return c.json({ error: 'Failed to get merchant', details: err.message }, 500);
+    return c.json({ error: 'Failed to get merchant' }, 500);
   }
 });
 
@@ -2040,7 +2044,7 @@ app.patch('/v1/merchants/:id', async (c) => {
     return c.json({ merchant: result.rows[0] });
   } catch (err: any) {
     console.error('Update merchant error:', err);
-    return c.json({ error: 'Failed to update merchant', details: err.message }, 500);
+    return c.json({ error: 'Failed to update merchant' }, 500);
   }
 });
 
@@ -2058,7 +2062,7 @@ app.post('/v1/merchants/:id/screen', async (c) => {
   } catch (err: any) {
     if (err.message === 'MERCHANT_NOT_FOUND') return c.json({ error: 'Merchant not found' }, 404);
     console.error('Screen merchant error:', err);
-    return c.json({ error: 'Screening failed', details: err.message }, 500);
+    return c.json({ error: 'Screening failed' }, 500);
   }
 });
 
